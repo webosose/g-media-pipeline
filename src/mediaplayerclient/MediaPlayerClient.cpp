@@ -128,8 +128,6 @@ MEDIA_STATUS_T MediaPlayerClient::Feed(const guint8* pBuffer,
                                              guint32 bufferSize,
                                              guint64 pts,
                                              MEDIA_DATA_CHANNEL_T esData) {
-  GMP_DEBUG_PRINT(("pBuffer = %p, bufferSize = %d, pts = %ld, esdata = %d",
-                   pBuffer, bufferSize, pts, esData));
   if (!player_) {
     GMP_DEBUG_PRINT(("Bufferplayer not created"));
     return MEDIA_ERROR;

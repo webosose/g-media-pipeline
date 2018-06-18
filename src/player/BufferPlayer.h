@@ -43,7 +43,8 @@ typedef enum {
 namespace gmp { namespace base { struct error_t; }}
 namespace gmp { namespace base { struct source_info_t; }}
 
-namespace gmp { namespace player {
+namespace gmp {
+namespace player {
 
 class BufferPlayer : public Player {
   public:
@@ -60,7 +61,7 @@ class BufferPlayer : public Player {
     virtual bool SetPlane(int planeId);
     virtual void Initialize(gmp::service::IService* service);
 
-    bool AcquireResources(gmp::base::source_info_t* source_info);
+    bool AcquireResources(gmp::base::source_info_t* sourceInfo);
     bool ReleaseResources();
 
     bool Load(const MEDIA_LOAD_DATA_T* loadData);
@@ -89,7 +90,6 @@ class BufferPlayer : public Player {
                                 const long destWidth,
                                 const long destHeight,
                                 const bool isFullScreen);
-    bool SetVideoInfo(const gmp::resource::videoResData_t videoResData);
 
     static gboolean HandleBusMessage(GstBus* bus,
                                      GstMessage* message,
@@ -105,12 +105,12 @@ class BufferPlayer : public Player {
     bool AddParserElements();
     bool AddDecoderElements();
     bool AddSinkElements();
-
-    bool PauseInternal();
+    void AddDecoderCapsProbe();
 
     bool ConnectBusCallback();
     bool DisconnectBusCallback();
 
+    bool PauseInternal();
     bool SeekInternal(const int64_t msecond);
 
     void SetAppSrcBufferLevel(MEDIA_SRC_ELEM_IDX_T srcIdx,
@@ -120,16 +120,15 @@ class BufferPlayer : public Player {
 
     void HandleBusStateMsg(GstMessage* pMessage);
     void HandleBusAsyncMsg();
-    void HandleBusStreamMsg(GstMessage* pMessage);
+    void HandleVideoInfoMsg(GstMessage* pMessage);
 
-    void SetResourcePropertyToSink();
-    bool SetLoadData(const MEDIA_LOAD_DATA_T* loadData);
-
-    void SetAudioConverterCaps();
-    void SetGstreamerDebug();
+    bool UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData);
+    bool UpdateVideoResData(const gmp::base::source_info_t *sourceInfo);
 
     static void EnoughData(GstElement* gstappsrc, gpointer user_data);
     static void SeekData(GstElement* appsrc, guint64 position, gpointer data);
+
+    void SetGstreamerDebug();
 
     /*Pipeline elements*/
     GstElement* videoPQueue_;
@@ -146,6 +145,7 @@ class BufferPlayer : public Player {
     GstElement* audioConverter_;
     GstElement* aResampler_;
     GstElement* aSinkQueue_;
+    GstElement* audioVolume_;
     GstElement* audioSink_;
 
     GstBus * busHandler_;
@@ -153,10 +153,12 @@ class BufferPlayer : public Player {
 
     int32_t planeId_;
     bool planeIdSet_;
+
     bool isUnloaded_;
-    bool playbackStarted_;
-    bool feedPossible_;
     bool recEndOfStream_;
+    bool feedPossible_;
+
+    bool flushDisabled_;
 
     guint loadDoneTimerId_;
     guint currPosTimerId_;
@@ -175,7 +177,11 @@ class BufferPlayer : public Player {
     CUSTOM_BUFFERING_STATE_T needFeedData_[IDX_MAX];
 
     guint64 totalFeed_[IDX_MAX];
+
+    gmp::resource::videoResData_t videoResData_;
 };
+
 }  // namespace player
 }  // namespace gmp
+
 #endif  // SRC_PLAYER_BUFFER_PLAYER_H_

@@ -49,6 +49,9 @@ struct videoResData_t {
   int escanType;
   // GMP_3D_TYPE e3DType;
   int e3DType;
+
+  int parWidth; // pixel-aspect-ratio width
+  int parHeight; // pixel-aspect-ratio height
 };
 
 struct audioResData_t {

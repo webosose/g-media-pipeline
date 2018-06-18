@@ -490,11 +490,14 @@ bool ResourceRequestor::setVideoInfo(const videoResData_t videoResData) {
   video_info_.width = static_cast<int>(videoResData.width);
   video_info_.height = static_cast<int>(videoResData.height);
   video_info_.frame_rate = static_cast<float>(videoResData.frameRate);
-  video_info_.pixel_aspect_ratio.width = 1;
-  video_info_.pixel_aspect_ratio.height = 1;
+  video_info_.pixel_aspect_ratio.width = videoResData.parWidth;
+  video_info_.pixel_aspect_ratio.height = videoResData.parHeight;
   video_info_.scan_type = (videoResData.escanType == /*SCANTYPE_PROGRESSIVE*/0 ? "progressive" : "interlaced");
   video_info_.path = "network";
   video_info_.adaptive = true;
+
+  GMP_INFO_PRINT(("setting videoSize[ %d, %d ]", video_info_.width, video_info_.height));
+
   return umsMDCCR_->setVideoInfo(video_info_);
 }
 

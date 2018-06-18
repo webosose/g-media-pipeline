@@ -146,6 +146,8 @@ void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
         videoresdata.frameRate = 0;
         videoresdata.escanType = 0;
         videoresdata.e3DType = 0;
+        videoresdata.parWidth = 1;
+        videoresdata.parHeight = 1;
         res_requestor_->setVideoInfo(videoresdata);
         break;
     }
