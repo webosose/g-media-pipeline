@@ -40,7 +40,7 @@ class IService {
   virtual void Notify(const NOTIFY_TYPE_T notification, const void *payload) = 0;
   virtual bool Wait() = 0;
   virtual bool Stop()= 0;
-  virtual bool acquire(gmp::base::source_info_t   *source_info = NULL) = 0;
+  virtual bool acquire(gmp::base::source_info_t   &source_info) = 0;
 };
 
 class Service : public IService {
@@ -48,13 +48,13 @@ class Service : public IService {
   ~Service();
   static Service *GetInstance(const char *service_name);
 
-  virtual void Notify(const NOTIFY_TYPE_T notification);
-  virtual void Notify(const NOTIFY_TYPE_T notification, const void *payload);
+  void Notify(const NOTIFY_TYPE_T notification) override;
+  void Notify(const NOTIFY_TYPE_T notification, const void *payload) override;
 
-  virtual bool Wait();
-  virtual bool Stop();
-  virtual void Initialize(gmp::player::Player *player);
-  virtual bool acquire(gmp::base::source_info_t   *source_info = NULL);
+  bool Wait() override;
+  bool Stop() override;
+  void Initialize(gmp::player::Player *player);
+  bool acquire(gmp::base::source_info_t   &source_info) override;
 
   // uMediaserver public API
   static bool LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);

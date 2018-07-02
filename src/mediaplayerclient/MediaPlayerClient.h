@@ -68,7 +68,7 @@ class MediaPlayerClient {
     bool SetExternalContext(GMainContext *context);
 
   private:
-    base::source_info_t* GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);
+    base::source_info_t GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);
 
     std::unique_ptr<gmp::player::BufferPlayer> player_;
     GMainContext *playerContext_;

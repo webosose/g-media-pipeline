@@ -76,15 +76,6 @@ void ResourceRequestor::ResourceRequestorInit(const std::string& connectionId) {
         std::placeholders::_3,
         std::placeholders::_4,
         std::placeholders::_5));
-
-  umsRMC_->registerPolicyActionHandler(
-      std::bind(&ResourceRequestor::policyActionHandler,
-        this,
-        std::placeholders::_1,
-        std::placeholders::_2,
-        std::placeholders::_3,
-        std::placeholders::_4,
-        std::placeholders::_5));
 }
 
 void ResourceRequestor::ResourceRequestorInit() {
@@ -227,8 +218,6 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
           __func__, __LINE__, err.what(), response.c_str());
     return false;
   }
-
-  setVideoInfo(videoResData_);
 
   GMP_DEBUG_PRINT("acquired Resource : %s", acquiredResource_.c_str());
   return true;
@@ -470,41 +459,22 @@ bool ResourceRequestor::mediaContentReady(bool state) {
   return umsMDCCR_->mediaContentReady(state);
 }
 
-// TODO(someone) : unused.
-bool ResourceRequestor::setVideoInfo(const /*NDL_ESP_VIDEO_INFO_T*/void* videoInfo) {
-#if 0
-  video_info_.width = static_cast<int>videoInfo.width;
-  video_info_.height = static_cast<int>videoInfo.height;
-  video_info_.frame_rate = static_cast<float>videoInfo.framerateNum / static_cast<float>videoInfo.framerateDen;
-  video_info_.scan_type = videoInfo.SCANTYPE == SCANTYPE_PROGRESSIVE ? "progressive" : "interlaced";
-  video_info_.pixel_aspect_ratio.width = static_cast<int>videoInfo.PARwidth;
-  video_info_.pixel_aspect_ratio.height = static_cast<int>videoInfo.PARheight;
-  video_info_.path = "network";
-  video_info_.adaptive = true;
-  return umsMDCCR_->setVideoInfo(video_info_);
-#endif
-  return 0;
-}
-
-bool ResourceRequestor::setVideoInfo(const videoResData_t videoResData) {
-  video_info_.width = static_cast<int>(videoResData.width);
-  video_info_.height = static_cast<int>(videoResData.height);
-  video_info_.frame_rate = static_cast<float>(videoResData.frameRate);
-  video_info_.pixel_aspect_ratio.width = videoResData.parWidth;
-  video_info_.pixel_aspect_ratio.height = videoResData.parHeight;
-  video_info_.scan_type = (videoResData.escanType == /*SCANTYPE_PROGRESSIVE*/0 ? "progressive" : "interlaced");
-  video_info_.path = "network";
-  video_info_.adaptive = true;
-
+bool ResourceRequestor::setVideoInfo(const gmp::base::video_info_t &videoInfo) {
+  video_info_.width = videoInfo.width;
+  video_info_.height = videoInfo.height;
+  video_info_.frame_rate.num = videoInfo.frame_rate.num;
+  video_info_.frame_rate.den = videoInfo.frame_rate.den;
+  video_info_.codec = videoInfo.codec;
+  video_info_.bit_rate = videoInfo.bit_rate;
   GMP_INFO_PRINT("setting videoSize[ %d, %d ]", video_info_.width, video_info_.height);
 
   return umsMDCCR_->setVideoInfo(video_info_);
 }
 
-bool ResourceRequestor::setSourceInfo(const gmp::base::source_info_t* sourceInfo) {
+bool ResourceRequestor::setSourceInfo(const gmp::base::source_info_t &sourceInfo) {
   //TODO(anonymous): Support multiple video/audio stream case
-  gmp::base::video_info_t video_stream_info = sourceInfo->video_streams.front();
-  gmp::base::audio_info_t audio_stream_info = sourceInfo->audio_streams.front();
+  gmp::base::video_info_t video_stream_info = sourceInfo.video_streams.front();
+  gmp::base::audio_info_t audio_stream_info = sourceInfo.audio_streams.front();
 
   videoResData_.width = video_stream_info.width;
   videoResData_.height = video_stream_info.height;

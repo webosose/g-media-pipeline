@@ -34,7 +34,6 @@ UriPlayer::UriPlayer()
     positionTimer_id_(0),
     bufferingTimer_id_(0),
     planeId_(-1),
-    source_info_(NULL),
     queue2_(NULL),
     buffering_(false),
     buffered_time_(-1),
@@ -42,9 +41,6 @@ UriPlayer::UriPlayer()
 }
 
 UriPlayer::~UriPlayer() {
-  if (source_info_) {
-    delete source_info_;
-  }
   Unload();
   gst_deinit ();
 }
@@ -229,7 +225,6 @@ void UriPlayer::Initialize(gmp::service::IService *service) {
     return;
 
   service_ = service;
-  source_info_ = new gmp::base::source_info_t;
 }
 
 bool UriPlayer::GetSourceInfo() {
@@ -291,17 +286,17 @@ bool UriPlayer::GetSourceInfo() {
     GMP_DEBUG_PRINT("Failed to get audio info from stream");
   }
   duration_ = duration;
-  source_info_->duration = GST_TIME_AS_MSECONDS(duration);
-  source_info_->seekable = true;
+  source_info_.duration = GST_TIME_AS_MSECONDS(duration);
+  source_info_.seekable = true;
 
   // TODO(anonymous): Support multi-track media case.
   base::program_info_t program;
   program.audio_stream = 1;
   program.video_stream = 1;
-  source_info_->programs.push_back(program);
+  source_info_.programs.push_back(program);
 
-  source_info_->video_streams.push_back(video_stream_info);
-  source_info_->audio_streams.push_back(audio_stream_info);
+  source_info_.video_streams.push_back(video_stream_info);
+  source_info_.audio_streams.push_back(audio_stream_info);
 
   GMP_DEBUG_PRINT("Width: : %d", video_stream_info.width);
   GMP_DEBUG_PRINT("Height: : %d", video_stream_info.height);
@@ -317,9 +312,7 @@ bool UriPlayer::GetSourceInfo() {
 
 void UriPlayer::NotifySourceInfo() {
   //TODO(anonymous): Support multiple video/audio stream case
-  service_->Notify(NOTIFY_SOURCE_INFO, source_info_);
-  service_->Notify(NOTIFY_VIDEO_INFO, &(source_info_->video_streams.front()));
-  service_->Notify(NOTIFY_AUDIO_INFO, &(source_info_->audio_streams.front()));
+  service_->Notify(NOTIFY_SOURCE_INFO, &source_info_);
 }
 
 gboolean UriPlayer::HandleBusMessage(GstBus *bus,
@@ -381,6 +374,37 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
           GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS (GST_BIN (pipeline),
                 GST_DEBUG_GRAPH_SHOW_ALL, dump_name.c_str());
         }
+      }
+      break;
+    }
+
+    case GST_MESSAGE_APPLICATION: {
+      const GstStructure *gStruct = gst_message_get_structure(message);
+
+      /* video-info message comes from sink element */
+      if (gst_structure_has_name(gStruct, "video-info")) {
+        GMP_INFO_PRINT("got video-info message");
+        base::video_info_t video_info;
+        memset(&video_info, 0, sizeof(base::video_info_t));
+        gint width, height, fps_n, fps_d, par_n, par_d;
+        gst_structure_get_int(gStruct, "width", &width);
+        gst_structure_get_int(gStruct, "height", &height);
+        gst_structure_get_fraction(gStruct, "framerate", &fps_n, &fps_d);
+        gst_structure_get_int(gStruct, "par_n", &par_n);
+        gst_structure_get_int(gStruct, "par_d", &par_d);
+
+        GMP_INFO_PRINT("width[%d], height[%d], framerate[%d/%d], pixel_aspect_ratio[%d/%d]",
+                width, height, fps_n, fps_d, par_n, par_d);
+
+        video_info.width = width;
+        video_info.height = height;
+        video_info.frame_rate.num = fps_n;
+        video_info.frame_rate.den = fps_d;
+        // TODO: we already know this info. but it's not used now.
+        video_info.bit_rate = 0;
+        video_info.codec = 0;
+
+        player->service_->Notify(NOTIFY_VIDEO_INFO, &video_info);
       }
       break;
     }

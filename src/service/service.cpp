@@ -137,18 +137,15 @@ void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
         composer.put("sourceInfo", *info);
         umc_->sendChangeNotificationJsonString(composer.result());
 
-        // TODO(ekwang) : be valid until using UMS_INTERNAL_API_VERSION 1 in MDC
-        gmp::resource::videoResData_t videoresdata;
-        memset(&videoresdata, 0, sizeof(gmp::resource::videoResData_t));
-        videoresdata.vcodec = GMP_VIDEO_CODEC_VC1; /* Corresponding to the int value 2*/
-        videoresdata.width = info->video_streams.front().width;
-        videoresdata.height = info->video_streams.front().height;
-        videoresdata.frameRate = 0;
-        videoresdata.escanType = 0;
-        videoresdata.e3DType = 0;
-        videoresdata.parWidth = 1;
-        videoresdata.parHeight = 1;
-        res_requestor_->setVideoInfo(videoresdata);
+        base::video_info_t videoInfo;
+        memset(&videoInfo, 0, sizeof(base::video_info_t));
+        videoInfo.width = info->video_streams.front().width;
+        videoInfo.height = info->video_streams.front().height;
+        videoInfo.frame_rate.num = info->video_streams.front().frame_rate.num;
+        videoInfo.frame_rate.den = info->video_streams.front().frame_rate.den;
+
+        res_requestor_->setVideoInfo(videoInfo);
+
         break;
     }
 
@@ -156,8 +153,12 @@ void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
         gmp::parser::Composer composer;
         base::video_info_t *info = (base::video_info_t*)payload;
         composer.put("videoInfo", *info);
-        // TODO(ekwang) : will use when finish to change UMS_INTERNAL_API_VERSION 2 for MDC
-        //umc_->sendChangeNotificationJsonString(composer.result());
+        GMP_INFO_PRINT("%s : info->width[%d], info->height[%d]", __func__, info->width, info->height);
+
+        umc_->sendChangeNotificationJsonString(composer.result());
+
+        res_requestor_->setVideoInfo(*info);
+
         break;
     }
 
@@ -255,15 +256,10 @@ bool Service::Stop() {
   return umc_->stop();
 }
 
-bool Service::acquire(gmp::base::source_info_t *source_info) {
+bool Service::acquire(gmp::base::source_info_t &source_info) {
   gmp::resource::PortResource_t resourceMMap;
   int plane_id = -1;
 
-  // It should be called before setDisplayWindow in UMS
-  if (!source_info) {
-    GMP_DEBUG_PRINT("%s : source info is empty!", __func__);
-    return false;
-  }
   res_requestor_->setSourceInfo(source_info);
 
   if (!res_requestor_->acquireResources(NULL, resourceMMap)) {

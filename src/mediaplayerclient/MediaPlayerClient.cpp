@@ -44,7 +44,8 @@ bool MediaPlayerClient::Load(const MEDIA_LOAD_DATA_T* loadData) {
 
   player_->Initialize(NULL);
 
-  if (!player_->AcquireResources(GetSourceInfo(loadData))) {
+  base::source_info_t source_info = GetSourceInfo(loadData);
+  if (!player_->AcquireResources(source_info)) {
     GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }
@@ -252,11 +253,11 @@ bool MediaPlayerClient::SetExternalContext(GMainContext *context) {
   playerContext_ = context;
 }
 
-base::source_info_t* MediaPlayerClient::GetSourceInfo(
+base::source_info_t MediaPlayerClient::GetSourceInfo(
     const MEDIA_LOAD_DATA_T* loadData) {
   GMP_DEBUG_PRINT("loadData = %p", loadData);
 
-  base::source_info_t* source_info = new gmp::base::source_info_t();
+  base::source_info_t source_info;
 
   base::video_info_t video_stream_info;
   base::audio_info_t audio_stream_info;
@@ -275,12 +276,12 @@ base::source_info_t* MediaPlayerClient::GetSourceInfo(
   base::program_info_t program;
   program.audio_stream = 1;
   program.video_stream = 1;
-  source_info->programs.push_back(program);
+  source_info.programs.push_back(program);
 
-  source_info->video_streams.push_back(video_stream_info);
-  source_info->audio_streams.push_back(audio_stream_info);
+  source_info.video_streams.push_back(video_stream_info);
+  source_info.audio_streams.push_back(audio_stream_info);
 
-  source_info->seekable = true;
+  source_info.seekable = true;
 
   GMP_DEBUG_PRINT("[video info] width: %d, height: %d, frameRate: %d",
                    video_stream_info.width,

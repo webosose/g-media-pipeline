@@ -67,15 +67,15 @@ class UriPlayer : public Player {
  public:
   UriPlayer();
   ~UriPlayer();
-  virtual bool Load(const std::string &uri);
-  virtual bool Unload();
-  virtual bool Play();
-  virtual bool Pause();
-  virtual bool SetPlayRate(const double rate);
-  virtual bool Seek(const int64_t position);
-  virtual bool SetVolume(int volume);
-  virtual bool SetPlane(int planeId);
-  virtual void Initialize(gmp::service::IService *service);
+  bool Load(const std::string &uri) override;
+  bool Unload() override;
+  bool Play() override;
+  bool Pause() override;
+  bool SetPlayRate(const double rate) override;
+  bool Seek(const int64_t position) override;
+  bool SetVolume(int volume) override;
+  bool SetPlane(int planeId) override;
+  void Initialize(gmp::service::IService *service) override;
   static gboolean HandleBusMessage(GstBus *bus,
                                    GstMessage *message, gpointer user_data);
   static gboolean NotifyCurrentTime(gpointer user_data);
@@ -96,7 +96,7 @@ class UriPlayer : public Player {
   }
 
  private:
-  base::source_info_t *source_info_;
+  base::source_info_t source_info_;
   std::string uri_;
   guint positionTimer_id_;
   std::shared_ptr<gmp::resource::ResourceRequestor> res_requestor_;

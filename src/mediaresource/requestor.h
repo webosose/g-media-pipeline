@@ -108,9 +108,8 @@ class ResourceRequestor {
 
   bool mediaContentReady(bool state);
 
-  bool setVideoInfo(const /*NDL_ESP_VIDEO_INFO_T*/ void* videoInfo);
-  bool setVideoInfo(const videoResData_t videoResData);
-  bool setSourceInfo(const gmp::base::source_info_t *sourceInfo);
+  bool setVideoInfo(const gmp::base::video_info_t &videoInfo);
+  bool setSourceInfo(const gmp::base::source_info_t &sourceInfo);
   void setAppId(std::string id);
 
  private:
@@ -143,7 +142,7 @@ class ResourceRequestor {
   std::string acquiredResource_;
   videoResData_t videoResData_;
   audioResData_t audioResData_;
-  uMediaServer::mdc::video_info_t video_info_;
+  ums::video_info_t video_info_;
   bool allowPolicy_;
 };
 

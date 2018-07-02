@@ -319,17 +319,9 @@ void BufferPlayer::Initialize(gmp::service::IService *service) {
   GMP_DEBUG_PRINT("END");
 }
 
-bool BufferPlayer::AcquireResources(gmp::base::source_info_t *sourceInfo) {
-  GMP_DEBUG_PRINT("sourceInfo(%p)", sourceInfo);
-
+bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo) {
   gmp::resource::PortResource_t resourceMMap;
   int planeId = -1;
-
-  // It should be called before setDisplayWindow in UMS
-  if (!sourceInfo) {
-    GMP_DEBUG_PRINT("%s : source info is empty!", __func__);
-    return false;
-  }
 
   resourceRequestor_->notifyForeground();
 
@@ -972,11 +964,11 @@ bool BufferPlayer::AddSinkElements() {
     return false;
   }
 
-  g_object_set(G_OBJECT(videoSink_), "driver-name", "vc4", NULL);
-  g_object_set(G_OBJECT(videoSink_), "ts-offset", TIMESTAMP_OFFSET, NULL);
+  g_object_set(G_OBJECT(videoSink_), "driver-name", "vc4",
+                                     "ts-offset", TIMESTAMP_OFFSET, NULL);
 
-  g_object_set(G_OBJECT(audioSink_), "device", "hw:0,0", NULL);
-  g_object_set(G_OBJECT(audioSink_), "ts-offset", TIMESTAMP_OFFSET, NULL);
+  g_object_set(G_OBJECT(audioSink_), "device", "hw:0,0",
+                                     "ts-offset", TIMESTAMP_OFFSET, NULL);
 
   if (!gst_element_link_many(audioDecoder_, aSinkQueue_, audioConverter_,
                              aResampler_, audioVolume_, audioSink_, NULL)) {
@@ -1264,32 +1256,26 @@ void BufferPlayer::HandleVideoInfoMsg(GstMessage *pMessage) {
     gst_structure_get_int(pStructure, "par_w", &par_width);
     gst_structure_get_int(pStructure, "par_h", &par_height);
 
-    videoResData_.width = width;
-    videoResData_.height = height;
-    videoResData_.frameRate = (double)numerator / (double)denominator;
-    videoResData_.parWidth = par_width;
-    videoResData_.parHeight = par_height;
+    videoInfo_.width = width;
+    videoInfo_.height = height;
+    videoInfo_.frame_rate.num = numerator;
+    videoInfo_.frame_rate.den = denominator;
 
     GMP_INFO_PRINT("new videoSize[ %d, %d ] framerate[%f] par_w[%d] par_h[%d]",
-        videoResData_.width, videoResData_.height, videoResData_.frameRate,
-        videoResData_.parWidth, videoResData_.parHeight);
+        videoInfo_.width, videoInfo_.height, videoInfo_.frame_rate.num / videoInfo_.frame_rate.den,
+        par_width, par_height);
 
     if (resourceRequestor_)
-      resourceRequestor_->setVideoInfo(videoResData_);
+      resourceRequestor_->setVideoInfo(videoInfo_);
 
     if (notifyFunction_) {
-      base::video_info_t videoInfoVal;
-      videoInfoVal.bit_rate = 0;
-      videoInfoVal.width = videoResData_.width;
-      videoInfoVal.height = videoResData_.height;
-      videoInfoVal.frame_rate.num = numerator;
-      videoInfoVal.frame_rate.den = denominator;
-
+      videoInfo_.bit_rate = 0;
+      videoInfo_.codec = 0;
       GMP_INFO_PRINT("sink new videoSize[ %d, %d ]",
-                      videoInfoVal.width, videoInfoVal.height);
+                      videoInfo_.width, videoInfo_.height);
 
       gmp::parser::Composer composer;
-      composer.put("videoInfo", videoInfoVal);
+      composer.put("videoInfo", videoInfo_);
       notifyFunction_(NOTIFY_VIDEO_INFO,
                       0, composer.result().c_str(), userData_);
     }
@@ -1323,24 +1309,20 @@ bool BufferPlayer::UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData) {
 }
 
 bool BufferPlayer::UpdateVideoResData(
-    const gmp::base::source_info_t *sourceInfo) {
+    const gmp::base::source_info_t &sourceInfo) {
   GMP_DEBUG_PRINT("");
 
-  gmp::base::video_info_t video_stream_info = sourceInfo->video_streams.front();
+  gmp::base::video_info_t video_stream_info = sourceInfo.video_streams.front();
 
-  videoResData_.width = video_stream_info.width;
-  videoResData_.height = video_stream_info.height;
-  videoResData_.vcodec = static_cast<GMP_VIDEO_CODEC>(video_stream_info.codec);
-  videoResData_.frameRate =
-      std::round(static_cast<float>(video_stream_info.frame_rate.num) /
-                 static_cast<float>(video_stream_info.frame_rate.den));
-  videoResData_.escanType = 0;
-  videoResData_.e3DType = 0;
-  videoResData_.parWidth = 1;
-  videoResData_.parHeight = 1;
+  videoInfo_.width = video_stream_info.width;
+  videoInfo_.height = video_stream_info.height;
+  videoInfo_.codec = static_cast<GMP_VIDEO_CODEC>(video_stream_info.codec);
+  videoInfo_.frame_rate.num = video_stream_info.frame_rate.num;
+  videoInfo_.frame_rate.den = video_stream_info.frame_rate.den;
+  videoInfo_.bit_rate = video_stream_info.bit_rate;
 
   GMP_INFO_PRINT("starting videoSize[ %d, %d ]",
-                  videoResData_.width, videoResData_.height);
+                  videoInfo_.width, videoInfo_.height);
 }
 
 void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer user_data) {

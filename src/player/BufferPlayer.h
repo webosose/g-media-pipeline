@@ -51,17 +51,17 @@ class BufferPlayer : public Player {
     BufferPlayer(const std::string& appId);
     ~BufferPlayer();
 
-    virtual bool Load(const std::string &uri);
-    virtual bool Unload();
-    virtual bool Play();
-    virtual bool Pause();
-    virtual bool SetPlayRate(const double rate);
-    virtual bool Seek(const int64_t position);
-    virtual bool SetVolume(int volume);
-    virtual bool SetPlane(int planeId);
-    virtual void Initialize(gmp::service::IService* service);
+    bool Load(const std::string &uri) override;
+    bool Unload() override;
+    bool Play() override;
+    bool Pause() override;
+    bool SetPlayRate(const double rate) override;
+    bool Seek(const int64_t position) override;
+    bool SetVolume(int volume) override;
+    bool SetPlane(int planeId) override;
+    void Initialize(gmp::service::IService* service) override;
 
-    bool AcquireResources(gmp::base::source_info_t* sourceInfo);
+    bool AcquireResources(gmp::base::source_info_t &sourceInfo);
     bool ReleaseResources();
 
     bool Load(const MEDIA_LOAD_DATA_T* loadData);
@@ -123,7 +123,7 @@ class BufferPlayer : public Player {
     void HandleVideoInfoMsg(GstMessage* pMessage);
 
     bool UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData);
-    bool UpdateVideoResData(const gmp::base::source_info_t *sourceInfo);
+    bool UpdateVideoResData(const gmp::base::source_info_t &sourceInfo);
 
     static void EnoughData(GstElement* gstappsrc, gpointer user_data);
     static void SeekData(GstElement* appsrc, guint64 position, gpointer data);
@@ -178,7 +178,7 @@ class BufferPlayer : public Player {
 
     guint64 totalFeed_[IDX_MAX];
 
-    gmp::resource::videoResData_t videoResData_;
+    gmp::base::video_info_t videoInfo_;
 };
 
 }  // namespace player
