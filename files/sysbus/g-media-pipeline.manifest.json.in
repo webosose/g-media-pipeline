@@ -1,0 +1,7 @@
+{
+    "version": "1.0.0",
+    "id": "g-media-pipeline",
+    "roleFilesPrv": [
+        "@WEBOS_INSTALL_ROOT@usr/share/ls2/roles/prv/com.webos.g-pipeline.json"
+    ]
+}

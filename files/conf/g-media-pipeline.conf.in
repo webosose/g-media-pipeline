@@ -1,0 +1,23 @@
+{
+    "outputs" : [
+        {
+            "name" : "g-media-pipeline-log",
+            "file" : "@WEBOS_INSTALL_LOGDIR@/g-media-pipeline.log",
+            "maxSize" : 100000,
+            "rotations" : 1
+        }
+    ],
+
+    "contexts" : [
+        {
+            "name" : "g-media-pipeline",
+            "level" : "debug",
+            "logProcessIds" : false,
+            "logThreadIds" : false,
+            "logToConsole" : false,
+            "rules" : [
+                {"filter" : "*.*", "output" : "g-media-pipeline-log"}
+            ]
+        }
+    ]
+}
