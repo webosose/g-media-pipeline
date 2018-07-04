@@ -15,9 +15,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 configure_file(sysbus/g-media-pipeline.manifest.json.in sysbus/g-media-pipeline.manifest.json @ONLY)
-configure_file(sysbus/com.webos.g-pipeline.json.prv.in sysbus/com.webos.g-pipeline.json @ONLY)
+configure_file(sysbus/com.webos.g-media-pipeline.role.json.in sysbus/com.webos.g-media-pipeline.role.json @ONLY)
+configure_file(sysbus/com.webos.g-media-pipeline.service.in sysbus/com.webos.g-media-pipeline.service @ONLY)
+configure_file(sysbus/com.webos.g-media-pipeline.api.json sysbus/com.webos.g-media-pipeline.api.json @ONLY)
+configure_file(sysbus/com.webos.g-media-pipeline.perm.json sysbus/com.webos.g-media-pipeline.perm.json @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/g-media-pipeline.manifest.json
     DESTINATION share/luna-service2/manifests.d/)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-pipeline.json
-    DESTINATION share/ls2/roles/prv/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.role.json
+    DESTINATION share/luna-service2/roles.d/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.service
+    DESTINATION share/luna-service2/services.d/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.api.json
+    DESTINATION share/luna-service2/api-permissions.d/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.perm.json
+    DESTINATION share/luna-service2/client-permissions.d/)
