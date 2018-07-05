@@ -44,9 +44,11 @@
 #define CURR_TIME_INTERVAL_MS    500
 #define LOAD_DONE_TIMEOUT_MS     10
 
-#define MEDIA_VIDEO_MAX      (10 * 1024 * 1024) // 10MB
+#define MEDIA_VIDEO_MAX      (15 * 1024 * 1024) // 15MB
 #define MEDIA_AUDIO_MAX      (4 * 1024 * 1024)  // 4MB
-#define QUEUE_MAX_SIZE       (10 * 1024 * 1024) // 10MB
+#define QUEUE_MAX_SIZE       (12 * 1024 * 1024) // 12MB
+#define QUEUE_MAX_TIME       (10 * GST_SECOND)  // 10Secs
+#define TIMESTAMP_OFFSET     (2 * GST_SECOND)   // 2Secs
 
 #define BUFFER_MIN_PERCENT 50
 #define MEDIA_CHANNEL_MAX  2
@@ -68,14 +70,13 @@ bool IsElementName(const GstElement *element, const char *name) {
 
 static void SetQueueBufferSize(GstElement *pElement,
                                guint maxBufferSize,
-                               guint64 maxTime,
                                guint maxBuffer) {
   guint currentSize = 0;
   g_object_get(G_OBJECT(pElement), "max-size-bytes", &currentSize, NULL);
 
   if (currentSize != maxBufferSize) {
     g_object_set(G_OBJECT(pElement), "max-size-bytes", maxBufferSize,
-                                     "max-size-time", maxTime,
+                                     "max-size-time", QUEUE_MAX_TIME,
                                      "max-size-buffers", maxBuffer,
                  NULL);
   }
@@ -531,7 +532,8 @@ bool BufferPlayer::SetDisplayWindow(const long left,
   if (!resourceRequestor_)
     return false;
 
-  GMP_INFO_PRINT(("SetDisplayWindow"));
+  GMP_INFO_PRINT(("fullscreen[%d], [ %d, %d, %d, %d]",
+                  isFullScreen, left, top, width, height));
   return resourceRequestor_->setVideoDisplayWindow(left, top, width,
                                                    height, isFullScreen);
 }
@@ -548,7 +550,9 @@ bool BufferPlayer::SetCustomDisplayWindow(const long srcLeft,
   if (!resourceRequestor_)
     return false;
 
-  GMP_INFO_PRINT(("SetCustomDisplayWindow"));
+  GMP_INFO_PRINT(("fullscreen[%d], [ %d, %d, %d, %d] => [ %d, %d, %d, %d]",
+                  isFullScreen, srcLeft, srcTop, srcWidth, srcHeight,
+                  destLeft, destTop, destWidth, destHeight));
   return resourceRequestor_->setVideoCustomDisplayWindow(srcLeft,
       srcTop, srcWidth, srcHeight, destLeft, destTop, destWidth, destHeight,
       isFullScreen);
@@ -647,7 +651,12 @@ gboolean BufferPlayer::NotifyCurrentTime(gpointer user_data) {
     player->notifyFunction_(NOTIFY_CURRENT_TIME,
                             currentPtsInMs, NULL, player->userData_);
 
-    GMP_DEBUG_PRINT(("current position: %lld", currentPtsInMs));
+    gint64 inSecs = currentPtsInMs / 1000;
+    gint hours = inSecs / 3600;
+    gint minutes = (inSecs - (3600 * hours)) / 60;
+    gint seconds = (inSecs - (3600 * hours) - (minutes * 60));
+    GMP_DEBUG_PRINT(("Curr Position: %lld [%d:%d:%d]",
+                     currentPtsInMs, hours, minutes, seconds));
   }
 
   return true;
@@ -777,7 +786,7 @@ bool BufferPlayer::AddParserElements() {
     return false;
   }
 
-  SetQueueBufferSize(videoPQueue_, QUEUE_MAX_SIZE, 0, 0);
+  SetQueueBufferSize(videoPQueue_, QUEUE_MAX_SIZE, 0);
 
   audioPQueue_ = gst_element_factory_make("queue", "audio-queue");
   if (!audioPQueue_) {
@@ -785,7 +794,7 @@ bool BufferPlayer::AddParserElements() {
     return false;
   }
 
-  SetQueueBufferSize(audioPQueue_, QUEUE_MAX_SIZE, 0, 0);
+  SetQueueBufferSize(audioPQueue_, QUEUE_MAX_SIZE, 0);
 
   switch (loadData_->videoCodec) {
     case GMP_VIDEO_CODEC_VC1:
@@ -964,10 +973,10 @@ bool BufferPlayer::AddSinkElements() {
   }
 
   g_object_set(G_OBJECT(videoSink_), "driver-name", "vc4", NULL);
-  g_object_set(G_OBJECT(videoSink_), "no-force-allocation", false, NULL);
+  g_object_set(G_OBJECT(videoSink_), "ts-offset", TIMESTAMP_OFFSET, NULL);
 
   g_object_set(G_OBJECT(audioSink_), "device", "hw:0,0", NULL);
-  g_object_set(G_OBJECT(audioSink_), "async", false, NULL);
+  g_object_set(G_OBJECT(audioSink_), "ts-offset", TIMESTAMP_OFFSET, NULL);
 
   if (!gst_element_link_many(audioDecoder_, aSinkQueue_, audioConverter_,
                              aResampler_, audioVolume_, audioSink_, NULL)) {
