@@ -112,7 +112,7 @@ void Service::Notify(const NOTIFY_TYPE_T notification) {
     }
 
     default: {
-      GMP_DEBUG_PRINT(("This notification can't be handled here!"));
+      GMP_DEBUG_PRINT("This notification can't be handled here!");
       break;
     }
   }
@@ -187,7 +187,7 @@ void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
     }
 
     default: {
-        GMP_DEBUG_PRINT(("This notification can't be handled here!"));
+        GMP_DEBUG_PRINT("This notification can't be handled here!");
         break;
     }
   }
@@ -261,18 +261,18 @@ bool Service::acquire(gmp::base::source_info_t *source_info) {
 
   // It should be called before setDisplayWindow in UMS
   if (!source_info) {
-    GMP_DEBUG_PRINT(("%s : source info is empty!", __func__));
+    GMP_DEBUG_PRINT("%s : source info is empty!", __func__);
     return false;
   }
   res_requestor_->setSourceInfo(source_info);
 
   if (!res_requestor_->acquireResources(NULL, resourceMMap)) {
-    GMP_DEBUG_PRINT(("resource acquisition failed"));
+    GMP_DEBUG_PRINT("resource acquisition failed");
     return false;
   }
 
   for (auto it : resourceMMap) {
-    GMP_DEBUG_PRINT(("Got Resource - name:%s, index:%d", it.first.c_str(), it.second));
+    GMP_DEBUG_PRINT("Got Resource - name:%s, index:%d", it.first.c_str(), it.second);
     if (it.first.substr(0, 4) == "DISP") {
       plane_id = kPlaneMap[it.second];
       break;
@@ -282,7 +282,7 @@ bool Service::acquire(gmp::base::source_info_t *source_info) {
   if (plane_id > 0)
     player_->SetPlane(plane_id);
 
-  GMP_DEBUG_PRINT(("resource acquired!!!, plane_id: %d", plane_id));
+  GMP_DEBUG_PRINT("resource acquired!!!, plane_id: %d", plane_id);
   return true;
 }
 
@@ -297,13 +297,13 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
 
     // TODO(jaehoon) : need to implement
     instance_->res_requestor_->registerUMSPolicyActionCallback([=] () {
-            GMP_DEBUG_PRINT(("registerUMSPolicyActionCallback"));
+            GMP_DEBUG_PRINT("registerUMSPolicyActionCallback");
             instance_->res_requestor_->notifyBackground();
             instance_->player_->Unload();
             });
 
     instance_->res_requestor_->registerPlaneIdCallback([=] (int32_t planeId) -> bool {
-            GMP_DEBUG_PRINT(("registerPlaneIdCallback planeId:%d", planeId));
+            GMP_DEBUG_PRINT("registerPlaneIdCallback planeId:%d", planeId);
             instance_->player_->SetPlane(planeId);
             return true;
             });
@@ -323,17 +323,17 @@ bool Service::UnloadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *messa
 
 // media operations
 bool Service::PlayEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  GMP_DEBUG_PRINT(("PlayEvent"));
+  GMP_DEBUG_PRINT("PlayEvent");
   return instance_->player_->Play();
 }
 
 bool Service::PauseEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  GMP_DEBUG_PRINT(("PauseEvent"));
+  GMP_DEBUG_PRINT("PauseEvent");
   return instance_->player_->Pause();
 }
 
 bool Service::SeekEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  GMP_DEBUG_PRINT(("SeekEvent"));
+  GMP_DEBUG_PRINT("SeekEvent");
   int64_t position = std::stoll(instance_->umc_->getMessageText(message));
   return instance_->player_->Seek(position);
 }
@@ -351,7 +351,7 @@ bool Service::SetUriEvent(UMSConnectorHandle *handle, UMSConnectorMessage *messa
 }
 
 bool Service::SetPlayRateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  GMP_DEBUG_PRINT(("SetPlayRateEvent"));
+  GMP_DEBUG_PRINT("SetPlayRateEvent");
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
   return instance_->player_->SetPlayRate(parser.get<double>("playRate"));
 }
@@ -381,17 +381,17 @@ bool Service::SetPropertyEvent(UMSConnectorHandle *handle, UMSConnectorMessage *
 }
 
 bool Service::SetVolumeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  GMP_DEBUG_PRINT(("SetVolumeEvent"));
+  GMP_DEBUG_PRINT("SetVolumeEvent");
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
   return instance_->player_->SetVolume(parser.get<int>("volume"));
 }
 
 bool Service::SetPlaneEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  GMP_DEBUG_PRINT(("SetPlaneEvent"));
+  GMP_DEBUG_PRINT("SetPlaneEvent");
   int planeID = -1;
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
   planeID = parser.get<int>("planeID");
-  GMP_DEBUG_PRINT(("setPlaneEvent player:%p, planeId:%d", instance_->player_, planeID));
+  GMP_DEBUG_PRINT("setPlaneEvent player:%p, planeId:%d", instance_->player_, planeID);
   return instance_->player_->SetPlane(planeID);
 }
 

@@ -47,18 +47,18 @@ PmLogContext GetPmLogContext();
     "[%s:%d]" FORMAT__, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__)
 
 /* Info Print */
-#define GMP_INFO_PRINT(__X__) GMP_LOG_INFO __X__
+#define GMP_INFO_PRINT GMP_LOG_INFO
 
 /* Debug Print */
-#define GMP_DEBUG_PRINT(__X__) GMP_LOG_DEBUG __X__
+#define GMP_DEBUG_PRINT GMP_LOG_DEBUG
 
 /* Assert print */
-#define GMPASSERT(cond) {\
-    if (!(cond)) {      \
-        GMP_DEBUG_PRINT(("ASSERT FAILED : %s:%d:%s: %s", \
-                __FILE__, __LINE__, __func__, #cond));\
-        assert(0);\
-    }\
+#define GMPASSERT(cond) { \
+    if (!(cond)) { \
+        GMP_DEBUG_PRINT("ASSERT FAILED : %s:%d:%s: %s", \
+                __FILE__, __LINE__, __func__, #cond); \
+        assert(0); \
+    } \
 }
 
 #endif  // SRC_LOG_LOG_H_

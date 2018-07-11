@@ -35,7 +35,7 @@ int main(int argc, char * argv[]) {
         break;
 
       case '?':
-        GMP_DEBUG_PRINT(("unknown service name"));
+        GMP_DEBUG_PRINT("unknown service name");
         break;
 
       default:  break;

@@ -51,27 +51,27 @@ UriPlayer::~UriPlayer() {
 
 bool UriPlayer::Load(const std::string &uri) {
   if (uri.empty()) {
-    GMP_DEBUG_PRINT(("Uri is empty!"));
+    GMP_DEBUG_PRINT("Uri is empty!");
     return false;
   }
-  GMP_DEBUG_PRINT(("load: %s", uri.c_str()));
+  GMP_DEBUG_PRINT("load: %s", uri.c_str());
   uri_ = uri;
   SetGstreamerDebug();
   gst_init(NULL, NULL);
   gst_pb_utils_init();
   if (!GetSourceInfo()) {
-    GMP_DEBUG_PRINT(("get source information failed!"));
+    GMP_DEBUG_PRINT("get source information failed!");
     return false;
   }
   // TODO(someone): check return value of acquire.
   // Should use wxh value for acquire.
   if (!service_->acquire(source_info_)) {
-    GMP_DEBUG_PRINT(("resouce acquire fail!"));
+    GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }
 
   if (!LoadPipeline()) {
-    GMP_DEBUG_PRINT(("pipeline load failed!"));
+    GMP_DEBUG_PRINT("pipeline load failed!");
     return false;
   }
 
@@ -83,14 +83,14 @@ bool UriPlayer::Load(const std::string &uri) {
 
   SetPlayerState(base::playback_state_t::LOADED);
 
-  GMP_DEBUG_PRINT(("Load Done: %s", uri_.c_str()));
+  GMP_DEBUG_PRINT("Load Done: %s", uri_.c_str());
   return true;
 }
 
 bool UriPlayer::Unload() {
-  GMP_DEBUG_PRINT(("unload"));
+  GMP_DEBUG_PRINT("unload");
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is null"));
+    GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
 
@@ -115,9 +115,9 @@ bool UriPlayer::Unload() {
 }
 
 bool UriPlayer::Play() {
-  GMP_DEBUG_PRINT(("play"));
+  GMP_DEBUG_PRINT("play");
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is null"));
+    GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
 
@@ -131,9 +131,9 @@ bool UriPlayer::Play() {
 }
 
 bool UriPlayer::Pause() {
-  GMP_DEBUG_PRINT(("pause"));
+  GMP_DEBUG_PRINT("pause");
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is null"));
+    GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
 
@@ -147,15 +147,15 @@ bool UriPlayer::Pause() {
 }
 
 bool UriPlayer::SetPlayRate(const double rate) {
-  GMP_DEBUG_PRINT(("SetPlayRate: %lf", rate));
+  GMP_DEBUG_PRINT("SetPlayRate: %lf", rate);
 
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is null"));
+    GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
 
   if (util::Util::CompareDouble(rate, play_rate_)) {
-    GMP_DEBUG_PRINT(("playRate setting not needed (same)"));
+    GMP_DEBUG_PRINT("playRate setting not needed (same)");
     return true;
   }
 
@@ -164,8 +164,8 @@ bool UriPlayer::SetPlayRate(const double rate) {
   seeking_ = true;
 
   gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
-  GMP_DEBUG_PRINT(("rate: %lf, position: %lld, duration: %lld",
-                  rate, position, duration_));
+  GMP_DEBUG_PRINT("rate: %lf, position: %lld, duration: %lld",
+                  rate, position, duration_);
 
   if (rate > 0.0) {
     return gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
@@ -186,10 +186,10 @@ bool UriPlayer::SetPlayRate(const double rate) {
 }
 
 bool UriPlayer::Seek(const int64_t msecond) {
-  GMP_DEBUG_PRINT(("Seek: %lld", msecond));
+  GMP_DEBUG_PRINT("Seek: %lld", msecond);
 
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is null"));
+    GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
 
@@ -203,10 +203,10 @@ bool UriPlayer::Seek(const int64_t msecond) {
 }
 
 bool UriPlayer::SetVolume(int volume) {
-  GMP_DEBUG_PRINT(("SetVolume: volume(%d)", volume));
+  GMP_DEBUG_PRINT("SetVolume: volume(%d)", volume);
 
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is null"));
+    GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
 
@@ -218,7 +218,7 @@ bool UriPlayer::SetVolume(int volume) {
 }
 
 bool UriPlayer::SetPlane(int planeId) {
-  GMP_DEBUG_PRINT(("setPlane planeId:(%d)", planeId));
+  GMP_DEBUG_PRINT("setPlane planeId:(%d)", planeId);
   planeId_ = planeId;
 
   return true;
@@ -248,7 +248,7 @@ bool UriPlayer::GetSourceInfo() {
   base::audio_info_t audio_stream_info;
 
   if (!video_info && !audio_info) {
-    GMP_DEBUG_PRINT(("Failed to get A/V info from stream"));
+    GMP_DEBUG_PRINT("Failed to get A/V info from stream");
     return false;
   }
 
@@ -264,15 +264,15 @@ bool UriPlayer::GetSourceInfo() {
     video_stream_info.frame_rate.num = gst_discoverer_video_info_get_framerate_num(video);
     video_stream_info.frame_rate.den = gst_discoverer_video_info_get_framerate_denom(video);
 
-    GMP_DEBUG_PRINT(("[video info] width: %d, height: %d, bitRate: %lld, frameRate: %d/%d",
+    GMP_DEBUG_PRINT("[video info] width: %d, height: %d, bitRate: %lld, frameRate: %d/%d",
                    video_stream_info.width,
                    video_stream_info.height,
                    video_stream_info.bit_rate,
                    video_stream_info.frame_rate.num,
                    video_stream_info.frame_rate.den
-                   ));
+                   );
   } else {
-    GMP_DEBUG_PRINT(("Failed to get video info from stream"));
+    GMP_DEBUG_PRINT("Failed to get video info from stream");
   }
 
   if (audio_info) {
@@ -283,12 +283,12 @@ bool UriPlayer::GetSourceInfo() {
     audio_stream_info.bit_rate = gst_discoverer_audio_info_get_bitrate(audio);
     audio_stream_info.sample_rate
       = gst_discoverer_audio_info_get_sample_rate(audio);
-    GMP_DEBUG_PRINT(("[audio info] bitRate: %lld, sampleRate: %d",
+    GMP_DEBUG_PRINT("[audio info] bitRate: %lld, sampleRate: %d",
                    audio_stream_info.bit_rate,
                    audio_stream_info.sample_rate
-                   ));
+                   );
   } else {
-    GMP_DEBUG_PRINT(("Failed to get audio info from stream"));
+    GMP_DEBUG_PRINT("Failed to get audio info from stream");
   }
   duration_ = duration;
   source_info_->duration = GST_TIME_AS_MSECONDS(duration);
@@ -303,9 +303,9 @@ bool UriPlayer::GetSourceInfo() {
   source_info_->video_streams.push_back(video_stream_info);
   source_info_->audio_streams.push_back(audio_stream_info);
 
-  GMP_DEBUG_PRINT(("Width: : %d", video_stream_info.width));
-  GMP_DEBUG_PRINT(("Height: : %d", video_stream_info.height));
-  GMP_DEBUG_PRINT(("Duration: : %lld", duration));
+  GMP_DEBUG_PRINT("Width: : %d", video_stream_info.width);
+  GMP_DEBUG_PRINT("Height: : %d", video_stream_info.height);
+  GMP_DEBUG_PRINT("Duration: : %lld", duration);
 
   g_clear_error(&err);
   gst_discoverer_stream_info_list_free(video_info);
@@ -335,13 +335,13 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
     }
 
     case GST_MESSAGE_EOS: {
-      GMP_DEBUG_PRINT(("Got endOfStream"));
+      GMP_DEBUG_PRINT("Got endOfStream");
       player->service_->Notify(NOTIFY_END_OF_STREAM);
       break;
     }
 
     case GST_MESSAGE_ASYNC_DONE: {
-      GMP_DEBUG_PRINT(("ASYNC DONE"));
+      GMP_DEBUG_PRINT("ASYNC DONE");
 
       if (!player->load_complete_) {
         player->service_->Notify(NOTIFY_LOAD_COMPLETED);
@@ -355,13 +355,13 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
     }
 
     case GST_STATE_PAUSED: {
-      GMP_DEBUG_PRINT(("PAUSED"));
+      GMP_DEBUG_PRINT("PAUSED");
       player->service_->Notify(NOTIFY_PAUSED);
       break;
     }
 
     case GST_STATE_PLAYING: {
-      GMP_DEBUG_PRINT(("PLAYING"));
+      GMP_DEBUG_PRINT("PLAYING");
       player->service_->Notify(NOTIFY_PLAYING);
       break;
     }
@@ -374,9 +374,9 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
 
         // generate dot graph when play start only(READY -> PAUSED)
         if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED) {
-          GMP_DEBUG_PRINT(("Generate dot graph from %s state to %s state.",
+          GMP_DEBUG_PRINT("Generate dot graph from %s state to %s state.",
                 gst_element_state_get_name (old_state),
-                gst_element_state_get_name (new_state)));
+                gst_element_state_get_name (new_state));
           std::string dump_name("g-media-pipeline[" + std::to_string(getpid()) + "]");
           GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS (GST_BIN (pipeline),
                 GST_DEBUG_GRAPH_SHOW_ALL, dump_name.c_str());
@@ -392,19 +392,19 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
 }
 
 bool UriPlayer::LoadPipeline() {
-  GMP_DEBUG_PRINT(("LoadPipeline planeId:%d", planeId_));
+  GMP_DEBUG_PRINT("LoadPipeline planeId:%d", planeId_);
 
   NotifySourceInfo();
 
   pipeline_ = gst_element_factory_make("playbin", "playbin");
 
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("Cannot create pipeline!"));
+    GMP_DEBUG_PRINT("Cannot create pipeline!");
     return false;
   }
 
   auto elementSetupCB = +[] (GstElement *playbin, GstElement *element, UriPlayer *player) -> void {
-    GMP_DEBUG_PRINT(("%s element deployed!", GST_ELEMENT_NAME(element)));
+    GMP_DEBUG_PRINT("%s element deployed!", GST_ELEMENT_NAME(element));
     if (g_strrstr(GST_ELEMENT_NAME(element), "queue2")) {
       // FIXME: should increase reference count for queue2?
       player->queue2_ = element;
@@ -424,7 +424,7 @@ bool UriPlayer::LoadPipeline() {
   GstElement *vSink = gst_element_factory_make("kmssink", NULL);
 
   if (!aSink || !vSink) {
-    GMP_DEBUG_PRINT(("Cannot create sink element!"));
+    GMP_DEBUG_PRINT("Cannot create sink element!");
     return false;
   }
   g_object_set(G_OBJECT(vSink), "driver-name", "vc4", NULL);
@@ -452,13 +452,13 @@ gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
     return true;
 
   if (!gst_element_query_position(player->pipeline_, GST_FORMAT_TIME, &pos)) {
-    GMP_DEBUG_PRINT(("gst_element_query_position fail!"));
+    GMP_DEBUG_PRINT("gst_element_query_position fail!");
     return true;
   }
 
   pos = GST_TIME_AS_MSECONDS(pos);
   player->service_->Notify(NOTIFY_CURRENT_TIME, &pos);
-  GMP_DEBUG_PRINT(("Current position: [%" G_GINT64_FORMAT " ms]", pos));
+  GMP_DEBUG_PRINT("Current position: [%" G_GINT64_FORMAT " ms]", pos);
 
   return true;
 }
@@ -475,14 +475,14 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
     return true;
 
   if (!gst_element_query_position (player->pipeline_, GST_FORMAT_TIME, &position)) {
-    GMP_DEBUG_PRINT(("gst_element_query_position fail!"));
+    GMP_DEBUG_PRINT("gst_element_query_position fail!");
     return true;
   }
 
   GstQuery *query = gst_query_new_buffering (GST_FORMAT_TIME);
 
   if (!gst_element_query (player->pipeline_, query)) {
-    GMP_DEBUG_PRINT(("gst_element_query fail!"));
+    GMP_DEBUG_PRINT("gst_element_query fail!");
     gst_query_unref (query);
     return true;
   }
@@ -490,19 +490,19 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   // percent means percentage of buffered data. This is a value between 0 and 100.
   // The is_buffering indicator is TRUE when the buffering is in progress.
   gst_query_parse_buffering_percent (query, &is_buffering, &percent);
-  GMP_DEBUG_PRINT(("is_buffering[%d] percent[%d]", is_buffering, percent));
+  GMP_DEBUG_PRINT("is_buffering[%d] percent[%d]", is_buffering, percent);
 
   // amount of buffering time left in milliseconds.
   gst_query_parse_buffering_stats (query, NULL, NULL, NULL, &buffering_left);
-  GMP_DEBUG_PRINT(("buffering_left[%" G_GINT64_FORMAT " ms] -> [%d sec]",
-            buffering_left, buffering_left / 1000));
+  GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%d sec]",
+            buffering_left, buffering_left / 1000);
 
   position = GST_TIME_AS_MSECONDS (position);
   duration = GST_TIME_AS_MSECONDS (player->duration_);
 
   buffered_time = player->queue2MaxSizeMsec - buffering_left + position;
-  GMP_DEBUG_PRINT(("preBuffered_time[%" G_GINT64_FORMAT " ms] buffered_time[%" G_GINT64_FORMAT " ms]",
-              player->buffered_time_, buffered_time));
+  GMP_DEBUG_PRINT("preBuffered_time[%" G_GINT64_FORMAT " ms] buffered_time[%" G_GINT64_FORMAT " ms]",
+              player->buffered_time_, buffered_time);
 
   // FIXME: it's inacuurate. sometimes buffered_time is reduced during buffering.
   if (player->buffered_time_ > buffered_time)
@@ -513,8 +513,8 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
     buffered_time = duration;
   }
 
-  GMP_DEBUG_PRINT(("buffered_time[%" G_GINT64_FORMAT " ms] -> [%d sec]",
-                    buffered_time, buffered_time / 1000));
+  GMP_DEBUG_PRINT("buffered_time[%" G_GINT64_FORMAT " ms] -> [%d sec]",
+                    buffered_time, buffered_time / 1000);
 
   /*
    * beginTime = ms
@@ -528,7 +528,7 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   bufferRange.remainingTime = buffered_time - position;
   bufferRange.percent = percent;
 
-  GMP_DEBUG_PRINT(("beginTime[%" G_GINT64_FORMAT " ms] bufferEndTime[%d sec] buffered_time[%" G_GINT64_FORMAT " ms] percent[%d]", position, buffered_time / 1000, buffered_time - position, percent));
+  GMP_DEBUG_PRINT("beginTime[%" G_GINT64_FORMAT " ms] bufferEndTime[%d sec] buffered_time[%" G_GINT64_FORMAT " ms] percent[%d]", position, buffered_time / 1000, buffered_time - position, percent);
 
   player->buffered_time_ = buffered_time;
   player->service_->Notify(NOTIFY_BUFFER_RANGE, &bufferRange);
@@ -536,7 +536,7 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
 
   //FIXME: need to check buffering condition for more details.
   if (percent == 100 && !is_buffering && buffering_left == 0) {
-    GMP_DEBUG_PRINT(("Buffering done!"));
+    GMP_DEBUG_PRINT("Buffering done!");
     base::playback_state_t state = player->GetPlayerState();
     if ( state == base::playback_state_t::PLAYING )
       gst_element_set_state(player->pipeline_, GST_STATE_PLAYING);
@@ -545,12 +545,12 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
 
     player->service_->Notify(NOTIFY_BUFFERING_END);
   } else { // else if (percent == 0 && is_buffering && buffering_left == kqueue2MaxSizeMsec)
-    GMP_DEBUG_PRINT(("Buffering..."));
+    GMP_DEBUG_PRINT("Buffering...");
     base::playback_state_t state = player->GetPlayerState();
     if ( state != base::playback_state_t::PAUSED ) {
       GstStateChangeReturn ret = gst_element_set_state(player->pipeline_, GST_STATE_PAUSED);
       if (ret == GST_STATE_CHANGE_FAILURE) {
-         GMP_DEBUG_PRINT(("gst_elmenet_set_state failed!"));
+         GMP_DEBUG_PRINT("gst_elmenet_set_state failed!");
          return true;
       }
       player->service_->Notify(NOTIFY_BUFFERING_START);
@@ -570,10 +570,10 @@ base::error_t UriPlayer::HandleErrorMessage(GstMessage *message) {
   error.errorCode = ConvertErrorCode(domain, (gint)err->code);
   error.errorText = g_strdup(err->message);
 
-  GMP_DEBUG_PRINT(("[GST_MESSAGE_ERROR][domain:%s][from:%s][code:%d][converted:%d][msg:%s]",
+  GMP_DEBUG_PRINT("[GST_MESSAGE_ERROR][domain:%s][from:%s][code:%d][converted:%d][msg:%s]",
                    g_quark_to_string(domain), (GST_OBJECT_NAME(GST_MESSAGE_SRC(message))),
-                   err->code, error.errorCode, err->message));
-  GMP_DEBUG_PRINT(("Debugging information: %s", debug_info ? debug_info : "none"));
+                   err->code, error.errorCode, err->message);
+  GMP_DEBUG_PRINT("Debugging information: %s", debug_info ? debug_info : "none");
 
   g_clear_error(&err);
   g_free(debug_info);
@@ -628,7 +628,7 @@ int32_t UriPlayer::ConvertErrorCode(GQuark domain, gint code) {
 }
 
 void UriPlayer::SetGstreamerDebug() {
-  GMP_DEBUG_PRINT((""));
+  GMP_DEBUG_PRINT("");
   const char *kDebug = "GST_DEBUG";
   const char *kDebugFile = "GST_DEBUG_FILE";
   const char *kDebugDot = "GST_DEBUG_DUMP_DOT_DIR";
@@ -637,7 +637,7 @@ void UriPlayer::SetGstreamerDebug() {
   pbnjson::JDomParser parser(NULL);
 
   if (!parser.parseFile(input_file, pbnjson::JSchema::AllSchema(), NULL)) {
-    GMP_DEBUG_PRINT(("Debug file parsing error"));
+    GMP_DEBUG_PRINT("Debug file parsing error");
     return;
   }
 
@@ -657,13 +657,13 @@ void UriPlayer::SetGstreamerDebug() {
 bool UriPlayer::FindQueue2Element()
 {
   if (!pipeline_) {
-    GMP_DEBUG_PRINT(("pipeline is NULL!"));
+    GMP_DEBUG_PRINT("pipeline is NULL!");
     return false;
   }
 
   auto compare_q2_string = +[] (const GValue *item, const gpointer user_data) -> gint {
     GstElement *element = reinterpret_cast<GstElement *>(g_value_get_object(item));
-    GMP_DEBUG_PRINT(("%s element deployed!", GST_ELEMENT_NAME(element)));
+    GMP_DEBUG_PRINT("%s element deployed!", GST_ELEMENT_NAME(element));
 
     if (!g_strrstr(GST_ELEMENT_NAME(element), "queue2")) return 1;
     else return 0;

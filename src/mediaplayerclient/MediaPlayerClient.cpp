@@ -25,34 +25,34 @@ MediaPlayerClient::MediaPlayerClient(const std::string& appId)
     : playerContext_(NULL),
       isStopCalled_(false) {
   player_.reset(new gmp::player::BufferPlayer(appId));
-  GMP_DEBUG_PRINT((" Player Created [%p]", player_.get()));
+  GMP_DEBUG_PRINT(" Player Created [%p]", player_.get());
 }
 
 MediaPlayerClient::~MediaPlayerClient() {
-  GMP_INFO_PRINT((" START"));
+  GMP_INFO_PRINT(" START");
   Stop();
-  GMP_INFO_PRINT(("END"));
+  GMP_INFO_PRINT("END");
 }
 
 bool MediaPlayerClient::Load(const MEDIA_LOAD_DATA_T* loadData) {
-  GMP_DEBUG_PRINT(("Load loadData = %p", loadData));
+  GMP_DEBUG_PRINT("Load loadData = %p", loadData);
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
   player_->Initialize(NULL);
 
   if (!player_->AcquireResources(GetSourceInfo(loadData))) {
-    GMP_DEBUG_PRINT(("resouce acquire fail!"));
+    GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }
 
   if (player_->Load(loadData)) {
-    GMP_DEBUG_PRINT(("Loaded Bufferplayer"));
+    GMP_DEBUG_PRINT("Loaded Bufferplayer");
   } else {
-    GMP_DEBUG_PRINT(("Failed to load player"));
+    GMP_DEBUG_PRINT("Failed to load player");
     return false;
   }
 
@@ -60,10 +60,10 @@ bool MediaPlayerClient::Load(const MEDIA_LOAD_DATA_T* loadData) {
 }
 
 bool MediaPlayerClient::Play(){
-  GMP_DEBUG_PRINT(("Play"));
+  GMP_DEBUG_PRINT("Play");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -71,10 +71,10 @@ bool MediaPlayerClient::Play(){
 }
 
 bool MediaPlayerClient::Pause(){
-  GMP_DEBUG_PRINT(("Pause"));
+  GMP_DEBUG_PRINT("Pause");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -82,13 +82,13 @@ bool MediaPlayerClient::Pause(){
 }
 
 bool MediaPlayerClient::Stop(){
-  GMP_INFO_PRINT(("START"));
+  GMP_INFO_PRINT("START");
 
   if (isStopCalled_)
     return true;
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -98,15 +98,15 @@ bool MediaPlayerClient::Stop(){
   player_->Unload();
 
   isStopCalled_ = true;
-  GMP_INFO_PRINT(("END"));
+  GMP_INFO_PRINT("END");
   return true;
 }
 
 bool MediaPlayerClient::Seek(int position){
-  GMP_DEBUG_PRINT(("Seek"));
+  GMP_DEBUG_PRINT("Seek");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -114,10 +114,10 @@ bool MediaPlayerClient::Seek(int position){
 }
 
 bool MediaPlayerClient::SetPlane(int planeId) {
-  GMP_DEBUG_PRINT(("SetPlane"));
+  GMP_DEBUG_PRINT("SetPlane");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -129,7 +129,7 @@ MEDIA_STATUS_T MediaPlayerClient::Feed(const guint8* pBuffer,
                                              guint64 pts,
                                              MEDIA_DATA_CHANNEL_T esData) {
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return MEDIA_ERROR;
   }
 
@@ -137,10 +137,10 @@ MEDIA_STATUS_T MediaPlayerClient::Feed(const guint8* pBuffer,
 }
 
 bool MediaPlayerClient::Flush() {
-  GMP_DEBUG_PRINT(("Flush"));
+  GMP_DEBUG_PRINT("Flush");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -152,10 +152,10 @@ bool MediaPlayerClient::SetDisplayWindow(const long left,
                                          const long width,
                                          const long height,
                                          const bool isFullScreen) {
-  GMP_DEBUG_PRINT(("SetDisplayWindow"));
+  GMP_DEBUG_PRINT("SetDisplayWindow");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -171,10 +171,10 @@ bool MediaPlayerClient::SetCustomDisplayWindow(const long srcLeft,
                                                const long destWidth,
                                                const long destHeight,
                                                const bool isFullScreen) {
-  GMP_DEBUG_PRINT(("SetCustomDisplayWindow"));
+  GMP_DEBUG_PRINT("SetCustomDisplayWindow");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -191,10 +191,10 @@ bool MediaPlayerClient::SetCustomDisplayWindow(const long srcLeft,
 
 bool MediaPlayerClient::RegisterCallback(
     GMP_CALLBACK_FUNCTION_T cbFunction, void *userData) {
-  GMP_DEBUG_PRINT(("RegisterCallback"));
+  GMP_DEBUG_PRINT("RegisterCallback");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -203,10 +203,10 @@ bool MediaPlayerClient::RegisterCallback(
 }
 
 bool MediaPlayerClient::PushEndOfStream() {
-  GMP_DEBUG_PRINT(("PushEndOfStream"));
+  GMP_DEBUG_PRINT("PushEndOfStream");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -214,10 +214,10 @@ bool MediaPlayerClient::PushEndOfStream() {
 }
 
 bool MediaPlayerClient ::NotifyForeground() {
-  GMP_DEBUG_PRINT(("NotifyForeground"));
+  GMP_DEBUG_PRINT("NotifyForeground");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -225,10 +225,10 @@ bool MediaPlayerClient ::NotifyForeground() {
 }
 
 bool MediaPlayerClient::NotifyBackground() {
-  GMP_DEBUG_PRINT(("NotifyBackground"));
+  GMP_DEBUG_PRINT("NotifyBackground");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -236,10 +236,10 @@ bool MediaPlayerClient::NotifyBackground() {
 }
 
 bool MediaPlayerClient::SetVolume(int volume) {
-  GMP_DEBUG_PRINT(("SetVolume"));
+  GMP_DEBUG_PRINT("SetVolume");
 
   if (!player_) {
-    GMP_DEBUG_PRINT(("Bufferplayer not created"));
+    GMP_DEBUG_PRINT("Bufferplayer not created");
     return false;
   }
 
@@ -248,13 +248,13 @@ bool MediaPlayerClient::SetVolume(int volume) {
 }
 
 bool MediaPlayerClient::SetExternalContext(GMainContext *context) {
-  GMP_DEBUG_PRINT(("context = %p", context));
+  GMP_DEBUG_PRINT("context = %p", context);
   playerContext_ = context;
 }
 
 base::source_info_t* MediaPlayerClient::GetSourceInfo(
     const MEDIA_LOAD_DATA_T* loadData) {
-  GMP_DEBUG_PRINT(("loadData = %p", loadData));
+  GMP_DEBUG_PRINT("loadData = %p", loadData);
 
   base::source_info_t* source_info = new gmp::base::source_info_t();
 
@@ -282,11 +282,11 @@ base::source_info_t* MediaPlayerClient::GetSourceInfo(
 
   source_info->seekable = true;
 
-  GMP_DEBUG_PRINT(("[video info] width: %d, height: %d, frameRate: %d",
+  GMP_DEBUG_PRINT("[video info] width: %d, height: %d, frameRate: %d",
                    video_stream_info.width,
                    video_stream_info.height,
                    video_stream_info.frame_rate.num /
-                       video_stream_info.frame_rate.den));
+                       video_stream_info.frame_rate.den);
 
   return source_info;
 }

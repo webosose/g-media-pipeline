@@ -106,7 +106,7 @@ void ResourceRequestor::ResourceRequestorInit() {
     bool res = umsMDCCR_->registerPlaneIdCallback(std::bind(&ResourceRequestor::planeIdHandler,
           this,
           std::placeholders::_1));
-    GMP_DEBUG_PRINT(("PlaneID callback register : %s", res ? "success!" : "fail!"));
+    GMP_DEBUG_PRINT("PlaneID callback register : %s", res ? "success!" : "fail!");
   }
 
   umsRMC_->registerPolicyActionHandler(
@@ -121,7 +121,7 @@ void ResourceRequestor::ResourceRequestorInit() {
 
 void ResourceRequestor::unregisterWithMDC() {
   if (!umsMDC_->unregisterMedia()) {
-    GMP_DEBUG_PRINT(("MDC unregister error"));
+    GMP_DEBUG_PRINT("MDC unregister error");
   }
 }
 
@@ -159,8 +159,8 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
       audioResData_.version,
       audioResData_.channel);
   mrc::concatResourceList(&audioOptions, &AResource);
-  GMP_DEBUG_PRINT(("AResource size:%d, %s, %d",
-        AResource.size(), AResource.front().type.c_str(), AResource.front().quantity));
+  GMP_DEBUG_PRINT("AResource size:%d, %s, %d",
+        AResource.size(), AResource.front().type.c_str(), AResource.front().quantity);
 
   VResource = rc_->calcVdecResourceOptions((MRC::VideoCodecs)translateVideoCodec(videoResData_.vcodec),
       videoResData_.width,
@@ -168,8 +168,8 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
       videoResData_.frameRate,
       (MRC::ScanType)translateScanType(videoResData_.escanType),
       (MRC::_3DType)translate3DType(videoResData_.e3DType));
-  GMP_DEBUG_PRINT(("VResource size:%d, %s, %d",
-        VResource.size(), VResource[0].front().type.c_str(), VResource[0].front().quantity));
+  GMP_DEBUG_PRINT("VResource size:%d, %s, %d",
+        VResource.size(), VResource[0].front().type.c_str(), VResource[0].front().quantity);
   finalOptions.push_back(audioOptions);
   mrc::concatResourceListOptions(&finalOptions, &VResource);
 
@@ -201,49 +201,49 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
       JValue obj = pbnjson::Object();
       obj.put("resource", it.type);
       obj.put("qty", it.quantity);
-      GMP_DEBUG_PRINT(("calculator return : %s, %d", it.type.c_str(), it.quantity));
+      GMP_DEBUG_PRINT("calculator return : %s, %d", it.type.c_str(), it.quantity);
       objArray << obj;
     }
   }
 
   if (!serializer.toString(objArray, input_schema, payload)) {
-    GMP_DEBUG_PRINT(("[%s], fail to serializer to string", __func__));
+    GMP_DEBUG_PRINT("[%s], fail to serializer to string", __func__);
     return false;
   }
 
-  GMP_DEBUG_PRINT(("send acquire to uMediaServer payload:%s", payload.c_str()));
+  GMP_DEBUG_PRINT("send acquire to uMediaServer payload:%s", payload.c_str());
 
   if (!umsRMC_->acquire(payload, response)) {
-    GMP_DEBUG_PRINT(("fail to acquire!!! response : %s", response.c_str()));
+    GMP_DEBUG_PRINT("fail to acquire!!! response : %s", response.c_str());
     return false;
   }
-  GMP_DEBUG_PRINT(("acquire response:%s", response.c_str()));
+  GMP_DEBUG_PRINT("acquire response:%s", response.c_str());
 
   try {
     parsePortInformation(response, resourceMMap);
     parseResources(response, acquiredResource_);
   } catch (const std::runtime_error & err) {
-    GMP_DEBUG_PRINT(("[%s:%d] err=%s, response:%s",
-          __func__, __LINE__, err.what(), response.c_str()));
+    GMP_DEBUG_PRINT("[%s:%d] err=%s, response:%s",
+          __func__, __LINE__, err.what(), response.c_str());
     return false;
   }
 
   setVideoInfo(videoResData_);
 
-  GMP_DEBUG_PRINT(("acquired Resource : %s", acquiredResource_.c_str()));
+  GMP_DEBUG_PRINT("acquired Resource : %s", acquiredResource_.c_str());
   return true;
 }
 
 bool ResourceRequestor::releaseResource() {
   if (acquiredResource_.empty()) {
-    GMP_DEBUG_PRINT(("[%s], resource already empty", __func__));
+    GMP_DEBUG_PRINT("[%s], resource already empty", __func__);
     return true;
   }
 
-  GMP_DEBUG_PRINT(("send release to uMediaServer. resource : %s", acquiredResource_.c_str()));
+  GMP_DEBUG_PRINT("send release to uMediaServer. resource : %s", acquiredResource_.c_str());
 
   if (!umsRMC_->release(acquiredResource_)) {
-    GMP_DEBUG_PRINT(("release error : %s", acquiredResource_.c_str()));
+    GMP_DEBUG_PRINT("release error : %s", acquiredResource_.c_str());
     return false;
   }
 
@@ -275,14 +275,14 @@ bool ResourceRequestor::policyActionHandler(const char *action,
     const char *requestorType,
     const char *requestorName,
     const char *connectionId) {
-  GMP_DEBUG_PRINT(("policyActionHandler action:%s, resources:%s, type:%s, name:%s, id:%s",
-        action, resources, requestorType, requestorName, connectionId));
+  GMP_DEBUG_PRINT("policyActionHandler action:%s, resources:%s, type:%s, name:%s, id:%s",
+        action, resources, requestorType, requestorName, connectionId);
   if (allowPolicy_) {
     if (nullptr != cb_) {
       cb_();
     }
     if (!umsRMC_->release(acquiredResource_)) {
-      GMP_DEBUG_PRINT(("release error in policyActionHandler: %s", acquiredResource_.c_str()));
+      GMP_DEBUG_PRINT("release error in policyActionHandler: %s", acquiredResource_.c_str());
       return false;
     }
   }
@@ -308,7 +308,7 @@ bool ResourceRequestor::parsePortInformation(const std::string& payload, PortRes
   }
 
   for (auto& it : resourceMMap) {
-    GMP_DEBUG_PRINT(("port Resource - %s, : [%d] ", it.first.c_str(), it.second));
+    GMP_DEBUG_PRINT("port Resource - %s, : [%d] ", it.first.c_str(), it.second);
   }
 
   return true;
@@ -369,7 +369,7 @@ int ResourceRequestor::translateVideoCodec(const GMP_VIDEO_CODEC vcodec) const {
       break;
   }
 
-  GMP_DEBUG_PRINT(("vcodec[%d] => ev[%d]", vcodec, ev));
+  GMP_DEBUG_PRINT("vcodec[%d] => ev[%d]", vcodec, ev);
 
   return static_cast<int>(ev);
 }
@@ -395,7 +395,7 @@ int ResourceRequestor::translateAudioCodec(const GMP_AUDIO_CODEC acodec) const {
       break;
   }
 
-  GMP_DEBUG_PRINT(("acodec[%d] => ea[%d]", acodec, ea));
+  GMP_DEBUG_PRINT("acodec[%d] => ea[%d]", acodec, ea);
   return static_cast<int>(ea);
 }
 
@@ -496,7 +496,7 @@ bool ResourceRequestor::setVideoInfo(const videoResData_t videoResData) {
   video_info_.path = "network";
   video_info_.adaptive = true;
 
-  GMP_INFO_PRINT(("setting videoSize[ %d, %d ]", video_info_.width, video_info_.height));
+  GMP_INFO_PRINT("setting videoSize[ %d, %d ]", video_info_.width, video_info_.height);
 
   return umsMDCCR_->setVideoInfo(video_info_);
 }
@@ -522,10 +522,10 @@ bool ResourceRequestor::setSourceInfo(const gmp::base::source_info_t* sourceInfo
 
 
 void ResourceRequestor::planeIdHandler(int32_t planePortIdx) {
-  GMP_DEBUG_PRINT(("planePortIndex = %d", planePortIdx));
+  GMP_DEBUG_PRINT("planePortIndex = %d", planePortIdx);
   if (nullptr != planeIdCb_) {
     bool res = planeIdCb_(planePortIdx);
-    GMP_DEBUG_PRINT(("PlanePort[%d] register : %s", planePortIdx, res ? "success!" : "fail!"));
+    GMP_DEBUG_PRINT("PlanePort[%d] register : %s", planePortIdx, res ? "success!" : "fail!");
   }
 }
 void ResourceRequestor::setAppId(std::string id) {
