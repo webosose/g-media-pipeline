@@ -14,6 +14,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#ifndef SRC_MEDIAPLAYERCLIENT_MEDIAPLAYERCLIENT_H_
+#define SRC_MEDIAPLAYERCLIENT_MEDIAPLAYERCLIENT_H_
+
 #include <glib.h>
 
 #include <vector>
@@ -21,8 +24,8 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "PlayerTypes.h"
-#include "types.h"
+#include "player/PlayerTypes.h"
+#include "base/types.h"
 
 namespace gmp { namespace resource { class ResourceRequestor; }}
 namespace gmp { namespace player {
@@ -30,8 +33,7 @@ namespace gmp { namespace player {
 class BufferPlayer;
 
 class MediaPlayerClient {
-
-  public:
+ public:
     MediaPlayerClient(const std::string& appId);
     ~MediaPlayerClient();
 
@@ -67,7 +69,7 @@ class MediaPlayerClient {
     bool SetVolume(int volume);
     bool SetExternalContext(GMainContext *context);
 
-  private:
+ private:
     base::source_info_t GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);
 
     std::unique_ptr<gmp::player::BufferPlayer> player_;
@@ -76,4 +78,8 @@ class MediaPlayerClient {
     bool isStopCalled_;
 };
 
-}}
+}  // namespace player
+}  // namespace gmp
+
+
+#endif  // SRC_MEDIAPLAYERCLIENT_MEDIAPLAYERCLIENT_H_

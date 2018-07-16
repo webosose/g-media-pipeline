@@ -154,11 +154,8 @@ void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
         base::video_info_t *info = (base::video_info_t*)payload;
         composer.put("videoInfo", *info);
         GMP_INFO_PRINT("%s : info->width[%d], info->height[%d]", __func__, info->width, info->height);
-
         umc_->sendChangeNotificationJsonString(composer.result());
-
         res_requestor_->setVideoInfo(*info);
-
         break;
     }
 

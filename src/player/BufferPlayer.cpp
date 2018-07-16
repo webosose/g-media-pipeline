@@ -44,11 +44,11 @@
 #define CURR_TIME_INTERVAL_MS    500
 #define LOAD_DONE_TIMEOUT_MS     10
 
-#define MEDIA_VIDEO_MAX      (15 * 1024 * 1024) // 15MB
-#define MEDIA_AUDIO_MAX      (4 * 1024 * 1024)  // 4MB
-#define QUEUE_MAX_SIZE       (12 * 1024 * 1024) // 12MB
-#define QUEUE_MAX_TIME       (10 * GST_SECOND)  // 10Secs
-#define TIMESTAMP_OFFSET     (2 * GST_SECOND)   // 2Secs
+#define MEDIA_VIDEO_MAX      (15 * 1024 * 1024)  // 15MB
+#define MEDIA_AUDIO_MAX      (4 * 1024 * 1024)   // 4MB
+#define QUEUE_MAX_SIZE       (12 * 1024 * 1024)  // 12MB
+#define QUEUE_MAX_TIME       (10 * GST_SECOND)   // 10Secs
+#define TIMESTAMP_OFFSET     (2 * GST_SECOND)    // 2Secs
 
 #define BUFFER_MIN_PERCENT 50
 #define MEDIA_CHANNEL_MAX  2
@@ -82,7 +82,7 @@ static void SetQueueBufferSize(GstElement *pElement,
   }
 }
 
-} //namespace
+}  // namespace
 
 namespace gmp {
 namespace player {
@@ -194,11 +194,11 @@ bool BufferPlayer::Play() {
     if (currentState_== PLAYING_STATE)
       return true;
 
-    currentState_= PLAYING_STATE;
+    currentState_ = PLAYING_STATE;
     GstStateChangeReturn retVal = gst_element_set_state(pipeline_,
                                                         GST_STATE_PLAYING);
     if (retVal == GST_STATE_CHANGE_FAILURE) {
-      currentState_= STOPPED_STATE;
+      currentState_ = STOPPED_STATE;
     }
 
     if (resourceRequestor_)
@@ -262,7 +262,7 @@ bool BufferPlayer::SetPlayRate(const double rate) {
                                   GST_SEEK_FLAG_TRICKMODE),
                      GST_SEEK_TYPE_SET, position, GST_SEEK_TYPE_SET, duration_);
   } else {
-    //reverse playback might be unsupported with some demuxer(e.g. qtdemxer)
+    // reverse playback might be unsupported with some demuxer(e.g. qtdemxer)
     gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
                      GstSeekFlags(GST_SEEK_FLAG_FLUSH |
                                   GST_SEEK_FLAG_KEY_UNIT |
@@ -330,7 +330,7 @@ bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo) {
           Unload();
       });
   resourceRequestor_->registerPlaneIdCallback( [this] (int32_t planeId)->bool {
-       GMP_DEBUG_PRINT("registerPlaneIdCallback PlaneId = %d",planeId);
+       GMP_DEBUG_PRINT("registerPlaneIdCallback PlaneId = %d", planeId);
        planeId_ = planeId;
        return true;
      });
@@ -416,7 +416,7 @@ bool BufferPlayer::Flush() {
     return false;
   }
 
-  //init values regarding with feeding
+  // init values regarding with feeding
   memset(&totalFeed_, 0x00, (sizeof(guint64)*IDX_MAX));
 
   needFeedData_[IDX_VIDEO] = CUSTOM_BUFFER_LOCKED;
@@ -424,7 +424,7 @@ bool BufferPlayer::Flush() {
 
   recEndOfStream_ = false;
 
-  //flush pipeline
+  // flush pipeline
   if (!gst_element_seek(pipeline_, (gdouble)(1.0),
                         GST_FORMAT_TIME, GstSeekFlags(GST_SEEK_FLAG_FLUSH |
                                                       GST_SEEK_FLAG_SKIP),
@@ -1119,7 +1119,7 @@ void BufferPlayer::SetAppSrcBufferLevel(MEDIA_SRC_ELEM_IDX_T srcIdx,
 
 bool BufferPlayer::IsBufferAvailable(MEDIA_SRC_ELEM_IDX_T srcIdx,
                                      guint64 newBufferSize){
-  guint64 maxBufferSize = 0, currBufferSize=0, availableSize = 0;
+  guint64 maxBufferSize = 0, currBufferSize = 0, availableSize = 0;
   bool bBufferAvailable = false;
 
   if (sourceInfo_[srcIdx]->pSrcElement != NULL) {

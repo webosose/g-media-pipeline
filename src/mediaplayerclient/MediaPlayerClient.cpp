@@ -17,7 +17,7 @@
 #include "MediaPlayerClient.h"
 
 #include "BufferPlayer.h"
-#include "log.h"
+#include "log/log.h"
 
 namespace gmp { namespace player {
 
@@ -60,7 +60,7 @@ bool MediaPlayerClient::Load(const MEDIA_LOAD_DATA_T* loadData) {
   return true;
 }
 
-bool MediaPlayerClient::Play(){
+bool MediaPlayerClient::Play() {
   GMP_DEBUG_PRINT("Play");
 
   if (!player_) {
@@ -71,7 +71,7 @@ bool MediaPlayerClient::Play(){
   return player_->Play();
 }
 
-bool MediaPlayerClient::Pause(){
+bool MediaPlayerClient::Pause() {
   GMP_DEBUG_PRINT("Pause");
 
   if (!player_) {
@@ -82,7 +82,7 @@ bool MediaPlayerClient::Pause(){
   return player_->Pause();
 }
 
-bool MediaPlayerClient::Stop(){
+bool MediaPlayerClient::Stop() {
   GMP_INFO_PRINT("START");
 
   if (isStopCalled_)
@@ -103,7 +103,7 @@ bool MediaPlayerClient::Stop(){
   return true;
 }
 
-bool MediaPlayerClient::Seek(int position){
+bool MediaPlayerClient::Seek(int position) {
   GMP_DEBUG_PRINT("Seek");
 
   if (!player_) {
@@ -292,6 +292,6 @@ base::source_info_t MediaPlayerClient::GetSourceInfo(
   return source_info;
 }
 
-} //End of namespace player
+}  // End of namespace player
 
-} //End of namespace gmp
+}  // End of namespace gmp

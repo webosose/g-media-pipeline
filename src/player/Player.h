@@ -17,7 +17,6 @@
 #ifndef SRC_PLAYER_PLAYER_H_
 #define SRC_PLAYER_PLAYER_H_
 
-#include <string>
 #include <glib.h>
 #include <glib-unix.h>
 #include <gst/gst.h>

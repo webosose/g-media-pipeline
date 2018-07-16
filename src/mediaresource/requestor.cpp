@@ -136,7 +136,6 @@ ResourceRequestor::~ResourceRequestor() {
 }
 
 bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortResource_t& resourceMMap) {
-
   // ResourceCaculator & ResourceManager is changed in WebOS 3.0
   mrc::ResourceList AResource;
   mrc::ResourceList audioOptions;
@@ -165,7 +164,7 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
   mrc::concatResourceListOptions(&finalOptions, &VResource);
 
 #if 0
-  static int renderModeCount =0;
+  static int renderModeCount = 0;
   mrc::ResourceCalculator::RenderMode renderMode;
   if (renderModeCount%2) {
     NDLLOG(LOGTAG, NDL_LOGI, "Rendering mode is punch-through\n");
@@ -472,7 +471,7 @@ bool ResourceRequestor::setVideoInfo(const gmp::base::video_info_t &videoInfo) {
 }
 
 bool ResourceRequestor::setSourceInfo(const gmp::base::source_info_t &sourceInfo) {
-  //TODO(anonymous): Support multiple video/audio stream case
+  // TODO(anonymous): Support multiple video/audio stream case
   gmp::base::video_info_t video_stream_info = sourceInfo.video_streams.front();
   gmp::base::audio_info_t audio_stream_info = sourceInfo.audio_streams.front();
 

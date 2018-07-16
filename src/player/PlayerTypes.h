@@ -14,8 +14,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef SRC_PLAYER_PLAYER_TYPE_H_
-#define SRC_PLAYER_PLAYER_TYPE_H_
+#ifndef SRC_PLAYER_PLAYERTYPES_H_
+#define SRC_PLAYER_PLAYERTYPES_H_
 
 #define PLANE_MAP_SIZE 4
 
@@ -40,8 +40,8 @@ typedef enum {
   NOTIFY_ERROR,
   NOTIFY_VIDEO_INFO,
   NOTIFY_AUDIO_INFO,
-  NOTIFY_BUFFER_FULL, // NOTIFY_BUFFERING_END? need to check the chromium media backend
-  NOTIFY_BUFFER_NEED, // NOTIFY_BUFFERING_START?
+  NOTIFY_BUFFER_FULL,  // NOTIFY_BUFFERING_END? need to check the chromium media backend
+  NOTIFY_BUFFER_NEED,  // NOTIFY_BUFFERING_START?
   NOTIFY_BUFFER_RANGE,
   NOTIFY_BUFFERING_START,
   NOTIFY_BUFFERING_END,
@@ -141,7 +141,6 @@ typedef enum {
   MEDIA_DATA_CH_A,                                                              /** For H264 data */
   MEDIA_DATA_CH_B,                                                              /** For AAC data */
   MEDIA_DATA_CH_MAX = MEDIA_DATA_CH_B,
-
 } MEDIA_DATA_CHANNEL_T;
 
 typedef struct MEDIA_VIDEO_DATA_INFO {
@@ -168,7 +167,6 @@ typedef struct MEDIA_AUDIO_DATA_INFO {
   guint bufferMinLevel;         // from CP
   guint bufferMaxLevel;         // from CP
   guint userQBufferLevel;       // set Queue buffer siz
-
 } MEDIA_AUDIO_DATA_INFO_T;
 
 typedef struct MEDIA_CUSTOM_CONTENT_INFO {
@@ -212,14 +210,13 @@ typedef struct MEDIA_CUSTOM_CONTENT_INFO {
 
   guint32 startTime;
   gboolean isDashTsEncrypted;
-
 } MEDIA_CUSTOM_CONTENT_INFO_T;
 
 typedef enum {
-   IDX_MULTI = 0,
-   IDX_VIDEO = IDX_MULTI,
-   IDX_AUDIO,
-   IDX_MAX,
+  IDX_MULTI = 0,
+  IDX_VIDEO = IDX_MULTI,
+  IDX_AUDIO,
+  IDX_MAX,
 } MEDIA_SRC_ELEM_IDX_T;
 
 typedef enum {
@@ -232,4 +229,4 @@ typedef enum {
   MEDIA_NOT_READY = -11,                          /**< API's resource is not ready */
 } MEDIA_STATUS_T;
 
-#endif //SRC_PLAYER_PLAYER_TYPE_H_
+#endif  // SRC_PLAYER_PLAYERTYPES_H_

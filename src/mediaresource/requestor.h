@@ -50,7 +50,7 @@ struct videoResData_t {
   // GMP_3D_TYPE e3DType;
   int e3DType;
 
-  int parWidth; // pixel-aspect-ratio width
+  int parWidth;  // pixel-aspect-ratio width
   int parHeight; // pixel-aspect-ratio height
 };
 
