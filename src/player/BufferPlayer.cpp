@@ -48,7 +48,7 @@
 #define MEDIA_AUDIO_MAX      (4 * 1024 * 1024)   // 4MB
 #define QUEUE_MAX_SIZE       (12 * 1024 * 1024)  // 12MB
 #define QUEUE_MAX_TIME       (10 * GST_SECOND)   // 10Secs
-#define TIMESTAMP_OFFSET     (2 * GST_SECOND)    // 2Secs
+#define TIMESTAMP_OFFSET     (1 * GST_SECOND)    // 1Secs
 
 #define BUFFER_MIN_PERCENT 50
 #define MEDIA_CHANNEL_MAX  2
@@ -577,15 +577,33 @@ gboolean BufferPlayer::HandleBusMessage(
 
   switch (messageType) {
     case GST_MESSAGE_ERROR: {
-      GMP_INFO_PRINT(" GST_MESSAGE_ERROR");
+      GError *pError = NULL;
+      gchar *pDebug = NULL;
+      gst_message_parse_error(message, &pError, &pDebug);
+      GMP_INFO_PRINT(" GST_MESSAGE_ERROR : %s pDebug ( %s )",
+                     pError->message, pDebug ? pDebug : "null");
+      g_error_free(pError);
+      g_free(pDebug);
       if (player->notifyFunction_)
         player->notifyFunction_(NOTIFY_ERROR, 0, NULL, player->userData_);
       break;
     }
+    case GST_MESSAGE_WARNING: {
+      GError *pWarning = NULL;
+      gchar *pDebug = NULL;
+      gst_message_parse_warning(message, &pWarning, &pDebug);
+      GMP_INFO_PRINT(" GST_MESSAGE_WARNING : %s, pDebug ( %s )",
+                     pWarning->message, pDebug ? pDebug : "null");
+      g_error_free(pWarning);
+      g_free(pDebug);
+      break;
+    }
     case GST_MESSAGE_EOS: {
       GMP_INFO_PRINT(" GST_MESSAGE_EOS");
-      if (player->notifyFunction_)
-        player->notifyFunction_(NOTIFY_END_OF_STREAM, 0, NULL, player->userData_);
+      if (player->notifyFunction_) {
+        player->notifyFunction_(NOTIFY_END_OF_STREAM,
+                                0, NULL, player->userData_);
+      }
       break;
     }
     case GST_MESSAGE_SEGMENT_START: {
@@ -1252,33 +1270,13 @@ void BufferPlayer::HandleVideoInfoMsg(GstMessage *pMessage) {
     gint numerator = 0; gint denominator = 0;
     gst_structure_get_fraction(pStructure, "framerate", &numerator,
                                                         &denominator);
-    gint par_width = 0, par_height = 0;
-    gst_structure_get_int(pStructure, "par_w", &par_width);
-    gst_structure_get_int(pStructure, "par_h", &par_height);
 
     videoInfo_.width = width;
     videoInfo_.height = height;
     videoInfo_.frame_rate.num = numerator;
     videoInfo_.frame_rate.den = denominator;
 
-    GMP_INFO_PRINT("new videoSize[ %d, %d ] framerate[%f] par_w[%d] par_h[%d]",
-        videoInfo_.width, videoInfo_.height, videoInfo_.frame_rate.num / videoInfo_.frame_rate.den,
-        par_width, par_height);
-
-    if (resourceRequestor_)
-      resourceRequestor_->setVideoInfo(videoInfo_);
-
-    if (notifyFunction_) {
-      videoInfo_.bit_rate = 0;
-      videoInfo_.codec = 0;
-      GMP_INFO_PRINT("sink new videoSize[ %d, %d ]",
-                      videoInfo_.width, videoInfo_.height);
-
-      gmp::parser::Composer composer;
-      composer.put("videoInfo", videoInfo_);
-      notifyFunction_(NOTIFY_VIDEO_INFO,
-                      0, composer.result().c_str(), userData_);
-    }
+    NotifyVideoInfo();
   }
 }
 
@@ -1321,8 +1319,26 @@ bool BufferPlayer::UpdateVideoResData(
   videoInfo_.frame_rate.den = video_stream_info.frame_rate.den;
   videoInfo_.bit_rate = video_stream_info.bit_rate;
 
-  GMP_INFO_PRINT("starting videoSize[ %d, %d ]",
-                  videoInfo_.width, videoInfo_.height);
+  NotifyVideoInfo();
+}
+
+void BufferPlayer::NotifyVideoInfo() {
+  GMP_INFO_PRINT("new videoSize[ %d, %d ] framerate[%f]",
+      videoInfo_.width, videoInfo_.height,
+      videoInfo_.frame_rate.num / videoInfo_.frame_rate.den);
+
+  if (resourceRequestor_)
+    resourceRequestor_->setVideoInfo(videoInfo_);
+
+  if (notifyFunction_) {
+    GMP_INFO_PRINT("sink new videoSize[ %d, %d ]",
+                    videoInfo_.width, videoInfo_.height);
+
+    gmp::parser::Composer composer;
+    composer.put("videoInfo", videoInfo_);
+    notifyFunction_(NOTIFY_VIDEO_INFO,
+                    0, composer.result().c_str(), userData_);
+  }
 }
 
 void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer user_data) {

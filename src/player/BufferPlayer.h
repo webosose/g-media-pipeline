@@ -125,6 +125,8 @@ class BufferPlayer : public Player {
     bool UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData);
     bool UpdateVideoResData(const gmp::base::source_info_t &sourceInfo);
 
+    void NotifyVideoInfo();
+
     static void EnoughData(GstElement* gstappsrc, gpointer user_data);
     static void SeekData(GstElement* appsrc, guint64 position, gpointer data);
 
