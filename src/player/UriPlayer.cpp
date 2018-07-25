@@ -104,6 +104,8 @@ bool UriPlayer::Unload() {
     bufferingTimer_id_ = 0;
   }
 
+  current_position_ = 0;
+
   SetPlayerState(base::playback_state_t::STOPPED);
 
   service_->Notify(NOTIFY_UNLOAD_COMPLETED);
@@ -155,20 +157,23 @@ bool UriPlayer::SetPlayRate(const double rate) {
     return true;
   }
 
+  if (current_position_ < 0) {
+    GMP_DEBUG_PRINT("last_postion is less than 0");
+    return false;
+  }
+
   play_rate_ = rate;
-  gmp::base::time_t position = 0;
   seeking_ = true;
 
-  gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
   GMP_DEBUG_PRINT("rate: %lf, position: %lld, duration: %lld",
-                  rate, position, duration_);
+                  rate, current_position_, duration_);
 
   if (rate > 0.0) {
     return gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
                      GstSeekFlags(GST_SEEK_FLAG_FLUSH |
                                   GST_SEEK_FLAG_KEY_UNIT |
                                   GST_SEEK_FLAG_TRICKMODE),
-                     GST_SEEK_TYPE_SET, position, GST_SEEK_TYPE_SET, duration_);
+                     GST_SEEK_TYPE_SET, current_position_, GST_SEEK_TYPE_SET, duration_);
   } else {
 // reverse playback might be unsupported with some demuxer(e.g. qtdemxer)
     return gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
@@ -177,7 +182,7 @@ bool UriPlayer::SetPlayRate(const double rate) {
                                   GST_SEEK_FLAG_TRICKMODE |
                                   GST_SEEK_FLAG_TRICKMODE_KEY_UNITS |
                                   GST_SEEK_FLAG_TRICKMODE_NO_AUDIO),
-                     GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_SET, position);
+                     GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_SET, current_position_);
   }
 }
 
@@ -477,6 +482,8 @@ gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
     GMP_DEBUG_PRINT("gst_element_query_position fail!");
     return true;
   }
+
+  player->current_position_ = pos;
 
   pos = GST_TIME_AS_MSECONDS(pos);
   player->service_->Notify(NOTIFY_CURRENT_TIME, &pos);

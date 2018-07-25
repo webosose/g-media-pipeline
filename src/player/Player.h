@@ -40,7 +40,8 @@ class Player {
     , play_rate_(1.0)
     , duration_(0)
     , load_complete_(false)
-    , seeking_(false) {}
+    , seeking_(false)
+    , current_position_(0) {}
   virtual ~Player() {}
 
   virtual bool Load(const std::string & uri) = 0;
@@ -60,6 +61,7 @@ class Player {
   gint64 duration_;
   bool load_complete_;
   bool seeking_;
+  gint64 current_position_;
 };
 
 class UriPlayer : public Player {
