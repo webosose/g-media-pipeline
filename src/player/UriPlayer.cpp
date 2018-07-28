@@ -37,6 +37,7 @@ UriPlayer::UriPlayer()
     queue2_(NULL),
     buffering_(false),
     buffered_time_(-1),
+    httpSource_(false),
     current_state_(base::playback_state_t::STOPPED) {
 }
 
@@ -74,8 +75,10 @@ bool UriPlayer::Load(const std::string &uri) {
   positionTimer_id_ = g_timeout_add(UPDATE_INTERVAL_MS,
                             (GSourceFunc)NotifyCurrentTime, this);
 
-  bufferingTimer_id_ = g_timeout_add(UPDATE_INTERVAL_MS,
-                            (GSourceFunc)NotifyBufferingTime, this);
+  /* Notify buffering time in case of httpsource only */
+  if (httpSource_)
+    bufferingTimer_id_ = g_timeout_add(UPDATE_INTERVAL_MS,
+                               (GSourceFunc)NotifyBufferingTime, this);
 
   SetPlayerState(base::playback_state_t::LOADED);
 
@@ -89,6 +92,9 @@ bool UriPlayer::Unload() {
     GMP_DEBUG_PRINT("pipeline is null");
     return false;
   }
+
+  if (queue2_)
+    g_object_unref(queue2_);
 
   gst_element_set_state(pipeline_, GST_STATE_NULL);
   gst_object_unref(GST_OBJECT(pipeline_));
@@ -158,7 +164,7 @@ bool UriPlayer::SetPlayRate(const double rate) {
   }
 
   if (current_position_ < 0) {
-    GMP_DEBUG_PRINT("last_postion is less than 0");
+    GMP_DEBUG_PRINT("current_postion is less than 0");
     return false;
   }
 
@@ -412,6 +418,30 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       break;
     }
 
+    case GST_MESSAGE_BUFFERING: {
+      /* we don't need to notify buffering message in case of filesrc */
+      if (!player->httpSource_)
+        break;
+
+      gint percent;
+      base::playback_state_t state = player->GetPlayerState();
+      gst_message_parse_buffering(message, &percent);
+
+      /* FIXME: we should notify buffering message only one for each case */
+      if (percent == 100) {
+        if (state == base::playback_state_t::PLAYING && player->load_complete_)
+          gst_element_set_state(player->pipeline_, GST_STATE_PLAYING);
+        player->service_->Notify(NOTIFY_BUFFERING_END);
+        GMP_DEBUG_PRINT("Buffering done!");
+      } else if (percent == 0) {
+        if (state == base::playback_state_t::PLAYING)
+          gst_element_set_state(player->pipeline_, GST_STATE_PAUSED);
+        player->service_->Notify(NOTIFY_BUFFERING_START);
+        GMP_DEBUG_PRINT("Buffering...");
+      }
+      break;
+    }
+
     default:  break;
   }
 
@@ -430,22 +460,31 @@ bool UriPlayer::LoadPipeline() {
     return false;
   }
 
-  auto elementSetupCB = +[] (GstElement *playbin, GstElement *element, UriPlayer *player) -> void {
-    GMP_DEBUG_PRINT("%s element deployed!", GST_ELEMENT_NAME(element));
-    if (g_strrstr(GST_ELEMENT_NAME(element), "queue2")) {
-      // FIXME: should increase reference count for queue2?
-      player->queue2_ = element;
-
-      /* The default queue size limits are 100 buffers, 2MB of data, or two seconds worth of data.
-       * This is too small value to support streaming playback.
-       * updated from 2MB to 24MB and ten seconds temporarily.
-       */
-      g_object_set(element, "max-size-bytes", player->queue2MaxSizeBytes,
-                            "max-size-time" , player->queue2MaxSizeTime, NULL);
+  auto sourceSetupCB = +[] (GstElement *playbin, GstElement *source, UriPlayer *player) -> void {
+    GstElementFactory *factory = gst_element_get_factory(source);
+    const gchar *name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory));
+    GMP_DEBUG_PRINT("Found [%s] element!", name);
+    /* we need to set buffering time logic in case of souphttpsrc. */
+    if (g_strcmp0(name, "souphttpsrc") == 0) {
+      player->httpSource_ = true;
     }
   };
 
-  g_signal_connect(pipeline_, "element-setup", G_CALLBACK(elementSetupCB), this);
+  auto elementSetupCB = +[] (GstElement *playbin, GstElement *element, UriPlayer *player) -> void {
+    gchar *name = gst_element_get_name(element);
+    GMP_DEBUG_PRINT("[%s] element deployed!", name);
+
+    if (g_strrstr(name, "queue2") != NULL) {
+      player->queue2_ = GST_ELEMENT_CAST(gst_object_ref(element));
+      GMP_INFO_PRINT("%s element set for the max_size_time property!", name);
+      g_object_set(element, "max-size-bytes", player->queue2MaxSizeBytes,
+                            "max-size-time", player->queue2MaxSizeTime, NULL);
+    }
+    g_free(name);
+  };
+
+  g_signal_connect(G_OBJECT(pipeline_), "source-setup", G_CALLBACK(sourceSetupCB), this);
+  g_signal_connect(G_OBJECT(pipeline_), "element-setup", G_CALLBACK(elementSetupCB), this);
 
   GstElement *aSink = gst_element_factory_make("alsasink", NULL);
   GstElement *vSink = gst_element_factory_make("kmssink", NULL);
@@ -494,7 +533,6 @@ gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
 
 gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   UriPlayer *player = reinterpret_cast<UriPlayer *>(user_data);
-  // TODO: no need to send buffer notification in case of file src
 
   gint percent;
   gint64 position, duration, buffered_time, buffering_left;
@@ -502,11 +540,6 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
 
   if (!player->pipeline_ || player->seeking_ || !player->load_complete_)
     return true;
-
-  if (!gst_element_query_position(player->pipeline_, GST_FORMAT_TIME, &position)) {
-    GMP_DEBUG_PRINT("gst_element_query_position fail!");
-    return true;
-  }
 
   GstQuery *query = gst_query_new_buffering(GST_FORMAT_TIME);
 
@@ -526,7 +559,7 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%d sec]",
             buffering_left, buffering_left / 1000);
 
-  position = GST_TIME_AS_MSECONDS(position);
+  position = GST_TIME_AS_MSECONDS(player->current_position_);
   duration = GST_TIME_AS_MSECONDS(player->duration_);
 
   buffered_time = player->queue2MaxSizeMsec - buffering_left + position;
@@ -563,29 +596,6 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   player->buffered_time_ = buffered_time;
   player->service_->Notify(NOTIFY_BUFFER_RANGE, &bufferRange);
   gst_query_unref(query);
-
-  // FIXME: need to check buffering condition for more details.
-  if (percent == 100 && !is_buffering && buffering_left == 0) {
-    GMP_DEBUG_PRINT("Buffering done!");
-    base::playback_state_t state = player->GetPlayerState();
-    if ( state == base::playback_state_t::PLAYING )
-      gst_element_set_state(player->pipeline_, GST_STATE_PLAYING);
-    else
-      gst_element_set_state(player->pipeline_, GST_STATE_PAUSED);
-
-    player->service_->Notify(NOTIFY_BUFFERING_END);
-  } else {  // else if (percent == 0 && is_buffering && buffering_left == kqueue2MaxSizeMsec)
-    GMP_DEBUG_PRINT("Buffering...");
-    base::playback_state_t state = player->GetPlayerState();
-    if ( state != base::playback_state_t::PAUSED ) {
-      GstStateChangeReturn ret = gst_element_set_state(player->pipeline_, GST_STATE_PAUSED);
-      if (ret == GST_STATE_CHANGE_FAILURE) {
-         GMP_DEBUG_PRINT("gst_elmenet_set_state failed!");
-         return true;
-      }
-      player->service_->Notify(NOTIFY_BUFFERING_START);
-    }
-  }
 
   return true;
 }
@@ -682,35 +692,6 @@ void UriPlayer::SetGstreamerDebug() {
     if (debug[i].hasKey(kDebugDot) && !debug[i][kDebugDot].asString().empty())
       setenv(kDebugDot, debug[i][kDebugDot].asString().c_str(), 1);
   }
-}
-
-bool UriPlayer::FindQueue2Element() {
-  if (!pipeline_) {
-    GMP_DEBUG_PRINT("pipeline is NULL!");
-    return false;
-  }
-
-  auto compare_q2_string = +[] (const GValue *item, const gpointer user_data) -> gint {
-    GstElement *element = reinterpret_cast<GstElement *>(g_value_get_object(item));
-    GMP_DEBUG_PRINT("%s element deployed!", GST_ELEMENT_NAME(element));
-
-    if (!g_strrstr(GST_ELEMENT_NAME(element), "queue2"))
-      return 1;
-    else
-      return 0;
-  };
-
-  gboolean found = FALSE;
-  GValue item = {0, };
-  GstIterator *it = gst_bin_iterate_recurse(GST_BIN_CAST (pipeline_));
-  found = gst_iterator_find_custom(it,
-          (GCompareFunc) compare_q2_string, &item, &pipeline_);
-  gst_iterator_free(it);
-
-  if (found) queue2_ = reinterpret_cast<GstElement *>(g_value_get_object(&item));
-
-  g_value_unset(&item);
-  return found;
 }
 
 }  // namespace player

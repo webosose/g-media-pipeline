@@ -89,7 +89,6 @@ class UriPlayer : public Player {
   base::error_t HandleErrorMessage(GstMessage *message);
   int32_t ConvertErrorCode(GQuark domain, gint code);
   void SetGstreamerDebug();
-  bool FindQueue2Element();
   base::playback_state_t GetPlayerState() const { return current_state_; }
   bool SetPlayerState(base::playback_state_t state) {
     current_state_ = state;
@@ -103,6 +102,7 @@ class UriPlayer : public Player {
   std::shared_ptr<gmp::resource::ResourceRequestor> res_requestor_;
   std::string connectID_;
   int32_t planeId_;
+  bool httpSource_;
 
   /* buffering variable */
   GstElement *queue2_;
