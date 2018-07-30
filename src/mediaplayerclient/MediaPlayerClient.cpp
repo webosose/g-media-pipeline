@@ -17,7 +17,7 @@
 #include "MediaPlayerClient.h"
 
 #include "BufferPlayer.h"
-#include "log/log.h"
+#include "log.h"
 
 namespace gmp { namespace player {
 

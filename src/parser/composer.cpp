@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <base/types.h>
-#include "parser/composer.h"
+#include "composer.h"
 
 namespace gmp { namespace parser {
 

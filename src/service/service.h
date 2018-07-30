@@ -21,7 +21,7 @@
 #include <string>
 
 #include "PlayerTypes.h"
-#include "base/types.h"
+#include "types.h"
 
 class UMSConnector;
 class UMSConnectorHandle;

@@ -24,8 +24,8 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "player/PlayerTypes.h"
-#include "base/types.h"
+#include "PlayerTypes.h"
+#include "types.h"
 
 namespace gmp { namespace resource { class ResourceRequestor; }}
 namespace gmp { namespace player {
