@@ -68,6 +68,8 @@ class MediaPlayerClient {
     bool NotifyBackground();
     bool SetVolume(int volume);
     bool SetExternalContext(GMainContext *context);
+    bool SetPlaybackRate(const double playbackRate);
+    const char* GetMediaID();
 
  private:
     base::source_info_t GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);

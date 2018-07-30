@@ -48,7 +48,7 @@
 #define MEDIA_AUDIO_MAX      (4 * 1024 * 1024)   // 4MB
 #define QUEUE_MAX_SIZE       (12 * 1024 * 1024)  // 12MB
 #define QUEUE_MAX_TIME       (10 * GST_SECOND)   // 10Secs
-#define TIMESTAMP_OFFSET     (1 * GST_SECOND)    // 1Secs
+#define TIMESTAMP_OFFSET     (2 * GST_SECOND)    // 2Secs
 
 #define BUFFER_MIN_PERCENT 50
 #define MEDIA_CHANNEL_MAX  2
@@ -108,8 +108,6 @@ BufferPlayer::BufferPlayer(const std::string& appId)
     isUnloaded_(false),
     recEndOfStream_(false),
     feedPossible_(false),
-    flushDisabled_(false),
-    loadDoneTimerId_(0),
     currPosTimerId_(0),
     currentPts_(0),
     currentState_(STOPPED_STATE),
@@ -160,11 +158,6 @@ bool BufferPlayer::Unload() {
   if (currPosTimerId_) {
     g_source_remove(currPosTimerId_);
     currPosTimerId_ = 0;
-  }
-
-  if (loadDoneTimerId_) {
-    g_source_remove(loadDoneTimerId_);
-    loadDoneTimerId_ = 0;
   }
 
   DisconnectBusCallback();
@@ -271,6 +264,7 @@ bool BufferPlayer::SetPlayRate(const double rate) {
                                   GST_SEEK_FLAG_TRICKMODE_NO_AUDIO),
                      GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_SET, position);
   }
+  return true;
 }
 
 bool BufferPlayer::Seek(const int64_t msecond) {
@@ -327,7 +321,9 @@ bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo) {
 
   resourceRequestor_->registerUMSPolicyActionCallback( [this] () {
           resourceRequestor_->notifyBackground();
-          Unload();
+
+          if (notifyFunction_)
+            notifyFunction_(NOTIFY_ERROR, GMP_ERROR_RES_ALLOC, NULL, userData_);
       });
   resourceRequestor_->registerPlaneIdCallback( [this] (int32_t planeId)->bool {
        GMP_DEBUG_PRINT("registerPlaneIdCallback PlaneId = %d", planeId);
@@ -550,6 +546,11 @@ bool BufferPlayer::SetCustomDisplayWindow(const long srcLeft,
       isFullScreen);
 }
 
+const std::string BufferPlayer::GetMediaID() {
+  if (resourceRequestor_)
+    return resourceRequestor_->getConnectionId();
+}
+
 std::string StreamStatusName(int streamType) {
   const char* streamStatusName[] = {
     "GST_STREAM_STATUS_TYPE_CREATE",
@@ -670,21 +671,6 @@ gboolean BufferPlayer::NotifyCurrentTime(gpointer user_data) {
   }
 
   return true;
-}
-
-gboolean BufferPlayer::NotifyLoadComplete(gpointer user_data) {
-  BufferPlayer *player = static_cast<BufferPlayer*>(user_data);
-  if (!player)
-    return false;
-
-  player->loadDoneTimerId_ = 0;
-  if (!player->load_complete_ && player->notifyFunction_) {
-    GMP_DEBUG_PRINT("Notify load complete!!!");
-    player->load_complete_ = true;
-    player->notifyFunction_(NOTIFY_LOAD_COMPLETED, 0, NULL, player->userData_);
-  }
-
-  return false;
 }
 
 bool BufferPlayer::CreatePipeline() {
@@ -880,6 +866,7 @@ bool BufferPlayer::AddDecoderElements() {
     default:
       GMP_DEBUG_PRINT("H264 Decoder");
       videoDecoder_ = gst_element_factory_make("omxh264dec", "omxh264-decoder");
+      g_object_set(G_OBJECT(videoDecoder_), "allow-flush-in-drain", false, NULL);
       break;
   }
 
@@ -1081,18 +1068,6 @@ bool BufferPlayer::SeekInternal(const int64_t msecond) {
   needFeedData_[IDX_AUDIO] = CUSTOM_BUFFER_LOCKED;
 
   recEndOfStream_ = false;
-
-  gchar* decoderName = NULL;
-  g_object_get(G_OBJECT(videoDecoder_), "name", &decoderName, NULL);
-  if (decoderName) {
-    if (std::string(decoderName) == std::string("omxh264-decoder")) {
-      g_object_set(G_OBJECT(videoDecoder_), "flush-in-drain", false, NULL);
-      flushDisabled_ = true;
-      GMP_DEBUG_PRINT("video [ %s ] flush-in-drain Disabled", decoderName);
-    }
-    g_free(decoderName);
-  }
-
   feedPossible_ = false;
   if (!gst_element_seek(pipeline_, play_rate_, GST_FORMAT_TIME,
                         GstSeekFlags(GST_SEEK_FLAG_FLUSH |
@@ -1199,11 +1174,6 @@ void BufferPlayer::HandleBusStateMsg(GstMessage *pMessage)  {
       break;
     }
     case GST_STATE_READY: {
-      if (!load_complete_ && pipeline_ == gstElement) {
-        loadDoneTimerId_ = g_timeout_add(LOAD_DONE_TIMEOUT_MS,
-                                         (GSourceFunc)NotifyLoadComplete, this);
-      }
-
       if (currentState_ != STOPPED_STATE && oldState > GST_STATE_READY)
         currentState_ = STOPPED_STATE;
       break;
@@ -1232,11 +1202,13 @@ void BufferPlayer::HandleBusStateMsg(GstMessage *pMessage)  {
 }
 
 void BufferPlayer::HandleBusAsyncMsg() {
-  GMP_DEBUG_PRINT("seeking_ = %d", seeking_);
+  GMP_DEBUG_PRINT("load_complete_ = %d, seeking_ = %d",
+                  load_complete_, seeking_);
 
   if (!load_complete_) {
     load_complete_ = true;
-    notifyFunction_(NOTIFY_LOAD_COMPLETED, 0, NULL, userData_);
+    if (notifyFunction_)
+      notifyFunction_(NOTIFY_LOAD_COMPLETED, 0, NULL, userData_);
 
     if (recEndOfStream_)
       return;
@@ -1245,13 +1217,8 @@ void BufferPlayer::HandleBusAsyncMsg() {
       needFeedData_[IDX_VIDEO] = CUSTOM_BUFFER_LOW;
   } else if (seeking_) {
     seeking_ = false;
-    notifyFunction_(NOTIFY_SEEK_DONE, 0, NULL, userData_);
-
-    if (flushDisabled_) {
-      g_object_set(G_OBJECT(videoDecoder_), "flush-in-drain", true, NULL);
-      flushDisabled_ = false;
-      GMP_DEBUG_PRINT("videoDecoder flush-in-drain Enabled");
-    }
+    if (notifyFunction_)
+      notifyFunction_(NOTIFY_SEEK_DONE, 0, NULL, userData_);
   }
 }
 
@@ -1323,9 +1290,9 @@ bool BufferPlayer::UpdateVideoResData(
 }
 
 void BufferPlayer::NotifyVideoInfo() {
-  GMP_INFO_PRINT("new videoSize[ %d, %d ] framerate[%f]",
+  GMP_INFO_PRINT("new videoSize[ %d, %d ] framerate[%d/%d]",
       videoInfo_.width, videoInfo_.height,
-      videoInfo_.frame_rate.num / videoInfo_.frame_rate.den);
+      videoInfo_.frame_rate.num, videoInfo_.frame_rate.den);
 
   if (resourceRequestor_)
     resourceRequestor_->setVideoInfo(videoInfo_);

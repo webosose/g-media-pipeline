@@ -25,7 +25,7 @@ MediaPlayerClient::MediaPlayerClient(const std::string& appId)
     : playerContext_(NULL),
       isStopCalled_(false) {
   player_.reset(new gmp::player::BufferPlayer(appId));
-  GMP_DEBUG_PRINT(" Player Created [%p]", player_.get());
+  GMP_INFO_PRINT(" Player Created [%p]", player_.get());
 }
 
 MediaPlayerClient::~MediaPlayerClient() {
@@ -251,6 +251,19 @@ bool MediaPlayerClient::SetVolume(int volume) {
 bool MediaPlayerClient::SetExternalContext(GMainContext *context) {
   GMP_DEBUG_PRINT("context = %p", context);
   playerContext_ = context;
+}
+
+bool MediaPlayerClient::SetPlaybackRate(const double playbackRate) {
+  GMP_DEBUG_PRINT("playbackRate = %f", playbackRate);
+  if (player_)
+    return player_->SetPlayRate(playbackRate);
+  return false;
+}
+
+const char* MediaPlayerClient::GetMediaID() {
+  if (player_)
+    return player_->GetMediaID().c_str();
+  return NULL;
 }
 
 base::source_info_t MediaPlayerClient::GetSourceInfo(

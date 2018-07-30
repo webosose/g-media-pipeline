@@ -91,12 +91,13 @@ class BufferPlayer : public Player {
                                 const long destHeight,
                                 const bool isFullScreen);
 
+    const std::string GetMediaID();
+
     static gboolean HandleBusMessage(GstBus* bus,
                                      GstMessage* message,
                                      gpointer user_data);
 
     static gboolean NotifyCurrentTime(gpointer user_data);
-    static gboolean NotifyLoadComplete(gpointer user_data);
 
   private:
     bool CreatePipeline();
@@ -160,11 +161,7 @@ class BufferPlayer : public Player {
     bool recEndOfStream_;
     bool feedPossible_;
 
-    bool flushDisabled_;
-
-    guint loadDoneTimerId_;
     guint currPosTimerId_;
-
     guint64 currentPts_;
     PIPELINE_STATE currentState_;
 
