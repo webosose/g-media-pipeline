@@ -270,10 +270,10 @@ base::source_info_t MediaPlayerClient::GetSourceInfo(
     const MEDIA_LOAD_DATA_T* loadData) {
   GMP_DEBUG_PRINT("loadData = %p", loadData);
 
-  base::source_info_t source_info;
+  base::source_info_t source_info = {};
 
-  base::video_info_t video_stream_info;
-  base::audio_info_t audio_stream_info;
+  base::video_info_t video_stream_info = {};
+  base::audio_info_t audio_stream_info = {};
 
   video_stream_info.width = loadData->width;
   video_stream_info.height = loadData->height;

@@ -250,8 +250,8 @@ bool UriPlayer::GetSourceInfo() {
   GList *video_info = gst_discoverer_info_get_video_streams(info);
   GList *audio_info = gst_discoverer_info_get_audio_streams(info);
 
-  base::video_info_t video_stream_info;
-  base::audio_info_t audio_stream_info;
+  base::video_info_t video_stream_info = {};
+  base::audio_info_t audio_stream_info = {};
 
   if (!video_info && !audio_info) {
     GMP_DEBUG_PRINT("Failed to get A/V info from stream");
