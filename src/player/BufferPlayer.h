@@ -146,9 +146,7 @@ class BufferPlayer : public Player {
 
     GstElement* audioDecoder_;
     GstElement* audioConverter_;
-    GstElement* aResampler_;
     GstElement* aSinkQueue_;
-    GstElement* audioVolume_;
     GstElement* audioSink_;
 
     GstBus * busHandler_;

@@ -48,7 +48,6 @@
 #define MEDIA_AUDIO_MAX      (4 * 1024 * 1024)   // 4MB
 #define QUEUE_MAX_SIZE       (12 * 1024 * 1024)  // 12MB
 #define QUEUE_MAX_TIME       (10 * GST_SECOND)   // 10Secs
-#define TIMESTAMP_OFFSET     (2 * GST_SECOND)    // 2Secs
 
 #define BUFFER_MIN_PERCENT 50
 #define MEDIA_CHANNEL_MAX  2
@@ -97,9 +96,7 @@ BufferPlayer::BufferPlayer(const std::string& appId)
     videoSink_(NULL),
     audioDecoder_(NULL),
     audioConverter_(NULL),
-    aResampler_(NULL),
     aSinkQueue_(NULL),
-    audioVolume_(NULL),
     audioSink_(NULL),
     busHandler_(NULL),
     gSigBusAsync_(0),
@@ -288,13 +285,8 @@ bool BufferPlayer::Seek(const int64_t msecond) {
 }
 
 bool BufferPlayer::SetVolume(int volume) {
-  if (!audioSink_)
-    return false;
-
-  gdouble floatVolume = (gdouble) ((gdouble)volume / 100.0);
-  GMP_DEBUG_PRINT("volume(%d), floatVolume(%f)", volume, floatVolume);
-  g_object_set(audioVolume_, "volume", floatVolume, NULL);
-  return true;
+  GMP_DEBUG_PRINT("Custime pipeline does not have volume setting.");
+  return false;
 }
 
 bool BufferPlayer::SetPlane(int planeId) {
@@ -938,45 +930,29 @@ bool BufferPlayer::AddSinkElements() {
     return false;
   }
 
-  aResampler_ = gst_element_factory_make("audioresample", "audio-resampler");
-  if (!aResampler_ ) {
-    GMP_DEBUG_PRINT("Failed to create audio ressampler");
-    return false;
-  }
-
-  audioVolume_ = gst_element_factory_make("volume", "audio-volume");
-  if (!audioVolume_ ) {
-    GMP_DEBUG_PRINT("Failed to create audio volume");
-    return false;
-  }
-
   aSinkQueue_ =  gst_element_factory_make("queue", "audiosink-queue");
   if (!aSinkQueue_ ) {
     GMP_DEBUG_PRINT("Failed to create audio sink Queue");
     return false;
   }
 
-  audioSink_ = gst_element_factory_make("alsasink", "audio-sink");
+  audioSink_ = gst_element_factory_make("pulsesink", "audio-sink");
   if (!audioSink_ ) {
     GMP_DEBUG_PRINT("Failed to create audio sink");
     return false;
   }
 
   gst_bin_add_many(GST_BIN(pipeline_), vSinkQueue_, videoSink_,
-                   audioConverter_, aResampler_, aSinkQueue_, audioVolume_, audioSink_, NULL);
+                   aSinkQueue_, audioConverter_, audioSink_, NULL);
   if (!gst_element_link_many(videoDecoder_, vSinkQueue_, videoSink_, NULL)) {
     GMP_DEBUG_PRINT("Failed to link video sink elements");
     return false;
   }
 
-  g_object_set(G_OBJECT(videoSink_), "driver-name", "vc4",
-                                     "ts-offset", TIMESTAMP_OFFSET, NULL);
-
-  g_object_set(G_OBJECT(audioSink_), "device", "hw:0,0",
-                                     "ts-offset", TIMESTAMP_OFFSET, NULL);
+  g_object_set(G_OBJECT(videoSink_), "driver-name", "vc4", NULL);
 
   if (!gst_element_link_many(audioDecoder_, aSinkQueue_, audioConverter_,
-                             aResampler_, audioVolume_, audioSink_, NULL)) {
+                             audioSink_, NULL)) {
     GMP_DEBUG_PRINT("Failed to link audio sink elements");
     return false;
   }
