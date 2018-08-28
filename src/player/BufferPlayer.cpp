@@ -224,8 +224,10 @@ bool BufferPlayer::Pause() {
 bool BufferPlayer::SetPlayRate(const double rate) {
   GMP_INFO_PRINT("SetPlayRate: %lf", rate);
 
-  if (!pipeline_)
+  if (!pipeline_) {
+    GMP_DEBUG_PRINT("pipeline handle is NULL");
     return true;
+  }
 
   if (!load_complete_) {
     GMP_DEBUG_PRINT("load_complete_ not ready. SetPlayRate false.");
@@ -266,6 +268,11 @@ bool BufferPlayer::SetPlayRate(const double rate) {
 
 bool BufferPlayer::Seek(const int64_t msecond) {
   GMP_INFO_PRINT("Seek: %lld", msecond);
+
+  if (!pipeline_) {
+    GMP_DEBUG_PRINT("pipeline handle is NULL");
+    return false;
+  }
 
   if (!load_complete_ ||currentState_ == STOPPED_STATE) {
     GMP_DEBUG_PRINT("not paused or playing state");
@@ -364,6 +371,19 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
   if (!CreatePipeline()) {
     GMP_DEBUG_PRINT("CreatePipeline Failed");
     return false;
+  }
+
+  if (loadData_->ptsToDecode > 0) {
+    // By calling seek with ptsToDecode, we handle ReInitialize in seek.
+    GMP_DEBUG_PRINT("Seek to (%lld) in Load", loadData_->ptsToDecode);
+    if (!gst_element_seek(pipeline_, 1.0, GST_FORMAT_TIME,
+                          GstSeekFlags(GST_SEEK_FLAG_FLUSH |
+                                       GST_SEEK_FLAG_KEY_UNIT),
+                          GST_SEEK_TYPE_SET, loadData_->ptsToDecode,
+                          GST_SEEK_TYPE_NONE, 0)) {
+      GMP_INFO_PRINT("pipeline seek failed");
+      return false;
+    }
   }
 
   currPosTimerId_ = g_timeout_add(CURR_TIME_INTERVAL_MS,
@@ -1284,7 +1304,7 @@ void BufferPlayer::NotifyVideoInfo() {
   }
 }
 
-void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer user_data) {
+void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer userData) {
   GMP_DEBUG_PRINT("Appsrc signal : EnoughData");
 
   if (!gstAppSrc)
@@ -1297,7 +1317,7 @@ void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer user_data) {
     srcIdx = 1;
   }
 
-  BufferPlayer *player = reinterpret_cast <BufferPlayer*>(user_data);
+  BufferPlayer *player = reinterpret_cast <BufferPlayer*>(userData);
   if ((player->needFeedData_[srcIdx] != CUSTOM_BUFFER_FULL) &&
       (player->needFeedData_[srcIdx] != CUSTOM_BUFFER_LOCKED)) {
     guint64 currBufferSize = 0;
@@ -1312,21 +1332,10 @@ void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer user_data) {
   }
 }
 
-void BufferPlayer::SeekData(GstElement *gstAppSrc, guint64 position,
-                            gpointer user_data) {
+gboolean BufferPlayer::SeekData(GstElement *gstAppSrc, guint64 position,
+                                gpointer userData) {
   GMP_DEBUG_PRINT("Appsrc signal : SeekData");
-
-  if (!gstAppSrc)
-    return;
-
-  BufferPlayer *player = reinterpret_cast <BufferPlayer*>(user_data);
-  for (gint32 idx = 0; idx < player->sourceInfo_.size(); idx++) {
-    if (player->sourceInfo_[idx]->pSrcElement == gstAppSrc) {
-      if (player->notifyFunction_)
-        player->notifyFunction_(NOTIFY_SEEK_DATA, idx, 0, player->userData_);
-      return;
-    }
-  }
+  return true;
 }
 
 void BufferPlayer::SetGstreamerDebug() {

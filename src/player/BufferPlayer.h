@@ -128,8 +128,9 @@ class BufferPlayer : public Player {
 
     void NotifyVideoInfo();
 
-    static void EnoughData(GstElement* gstappsrc, gpointer user_data);
-    static void SeekData(GstElement* appsrc, guint64 position, gpointer data);
+    static void EnoughData(GstElement* gstAppSrc, gpointer userData);
+    static gboolean SeekData(GstElement* gstAppSrc, guint64 position,
+                             gpointer userData);
 
     void SetGstreamerDebug();
 
