@@ -36,6 +36,7 @@ UriPlayer::UriPlayer()
     planeId_(-1),
     queue2_(NULL),
     buffering_(false),
+    buffering_time_updated_(false),
     buffered_time_(-1),
     httpSource_(false),
     current_state_(base::playback_state_t::STOPPED) {
@@ -125,12 +126,22 @@ bool UriPlayer::Play() {
     return false;
   }
 
-  if (!gst_element_set_state(pipeline_, GST_STATE_PLAYING))
-    return false;
+  base::playback_state_t state = GetPlayerState();
+  if (state == base::playback_state_t::PLAYING) {
+    GMP_DEBUG_PRINT("pipeline is already PLAYING state!");
+    return true;
+  }
+
+  std::lock_guard<std::mutex> lock(lock_);
+  if (!buffering_) {
+    if (!gst_element_set_state(pipeline_, GST_STATE_PLAYING))
+      return false;
+  }
 
   SetPlayerState(base::playback_state_t::PLAYING);
 
   service_->Notify(NOTIFY_PLAYING);
+
   return true;
 }
 
@@ -139,6 +150,12 @@ bool UriPlayer::Pause() {
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline is null");
     return false;
+  }
+
+  base::playback_state_t state = GetPlayerState();
+  if (state == base::playback_state_t::PAUSED) {
+    GMP_DEBUG_PRINT("pipeline is already PAUSED state!");
+    return true;
   }
 
   if (!gst_element_set_state(pipeline_, GST_STATE_PAUSED))
@@ -152,6 +169,7 @@ bool UriPlayer::Pause() {
 
 bool UriPlayer::SetPlayRate(const double rate) {
   GMP_DEBUG_PRINT("SetPlayRate: %lf", rate);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline is null");
@@ -194,6 +212,7 @@ bool UriPlayer::SetPlayRate(const double rate) {
 
 bool UriPlayer::Seek(const int64_t msecond) {
   GMP_DEBUG_PRINT("Seek: %lld", msecond);
+  std::lock_guard<std::mutex> lock(lock_);
 
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline is null");
@@ -201,8 +220,6 @@ bool UriPlayer::Seek(const int64_t msecond) {
   }
 
   seeking_ = true;
-  buffered_time_ = msecond;
-  // TODO(anonymous): Support reverse playback
   return gst_element_seek(pipeline_, (gdouble)play_rate_, GST_FORMAT_TIME,
                    GstSeekFlags(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
                    GST_SEEK_TYPE_SET, msecond * GST_MSECOND,
@@ -344,6 +361,7 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
 
     case GST_MESSAGE_ASYNC_DONE: {
       GMP_DEBUG_PRINT("ASYNC DONE");
+      std::lock_guard<std::mutex> lock(player->lock_);
 
       if (!player->load_complete_) {
         player->service_->Notify(NOTIFY_LOAD_COMPLETED);
@@ -351,6 +369,7 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       } else if (player->seeking_) {
         player->service_->Notify(NOTIFY_SEEK_DONE);
         player->seeking_ = false;
+        player->buffering_time_updated_ = true;
       }
 
       break;
@@ -428,12 +447,15 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       gst_message_parse_buffering(message, &percent);
 
       /* FIXME: we should notify buffering message only one for each case */
+      std::lock_guard<std::mutex> lock(player->lock_);
       if (percent == 100) {
+        player->buffering_ = false;
         if (state == base::playback_state_t::PLAYING && player->load_complete_)
           gst_element_set_state(player->pipeline_, GST_STATE_PLAYING);
         player->service_->Notify(NOTIFY_BUFFERING_END);
         GMP_DEBUG_PRINT("Buffering done!");
       } else if (percent == 0) {
+        player->buffering_ = true;
         if (state == base::playback_state_t::PLAYING)
           gst_element_set_state(player->pipeline_, GST_STATE_PAUSED);
         player->service_->Notify(NOTIFY_BUFFERING_START);
@@ -512,13 +534,13 @@ bool UriPlayer::LoadPipeline() {
 
 gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
   UriPlayer *player = reinterpret_cast<UriPlayer *>(user_data);
+  std::lock_guard<std::mutex> lock(player->lock_);
   gint64 pos = 0;
 
   if (!player->pipeline_ || player->seeking_ || !player->load_complete_)
     return true;
 
   if (!gst_element_query_position(player->pipeline_, GST_FORMAT_TIME, &pos)) {
-    GMP_DEBUG_PRINT("gst_element_query_position fail!");
     return true;
   }
 
@@ -533,50 +555,74 @@ gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
 
 gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   UriPlayer *player = reinterpret_cast<UriPlayer *>(user_data);
-
-  gint percent;
-  gint64 position, duration, buffered_time, buffering_left;
-  gboolean is_buffering, fully_buffered;
+  std::lock_guard<std::mutex> lock(player->lock_);
 
   if (!player->pipeline_ || player->seeking_ || !player->load_complete_)
     return true;
 
-  GstQuery *query = gst_query_new_buffering(GST_FORMAT_TIME);
+  base::buffer_range_t bufferRange = player->CalculateBufferingTime();
+  player->service_->Notify(NOTIFY_BUFFER_RANGE, &bufferRange);
 
-  if (!gst_element_query(player->pipeline_, query)) {
-    GMP_DEBUG_PRINT("gst_element_query fail!");
-    gst_query_unref(query);
-    return true;
-  }
+  return true;
+}
 
-  // percent means percentage of buffered data. This is a value between 0 and 100.
-  // The is_buffering indicator is TRUE when the buffering is in progress.
-  gst_query_parse_buffering_percent(query, &is_buffering, &percent);
-  GMP_DEBUG_PRINT("is_buffering[%d] percent[%d]", is_buffering, percent);
+base::buffer_range_t UriPlayer::CalculateBufferingTime() {
+  base::buffer_range_t bufferRange = { 0, 0, 0 ,0 };
+  gint percent;
+  gint64 position, duration, buffering_time, buffering_left;
+  gboolean is_buffering;
 
-  // amount of buffering time left in milliseconds.
-  gst_query_parse_buffering_stats(query, NULL, NULL, NULL, &buffering_left);
-  GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%d sec]",
+  if (buffering_time_updated_) {
+    gint64 pos;
+    if (!gst_element_query_position(pipeline_, GST_FORMAT_TIME, &pos)) {
+      return bufferRange;
+    }
+
+    percent = 0;
+    current_position_ = pos;
+    buffering_time = buffered_time_ = position = GST_TIME_AS_MSECONDS(pos);
+    buffering_time_updated_ = false;
+  } else {
+    GstQuery *query = gst_query_new_buffering(GST_FORMAT_TIME);
+
+    if (!gst_element_query(pipeline_, query)) {
+      gst_query_unref(query);
+      return bufferRange;
+    }
+
+    // percent means percentage of buffered data. This is a value between 0 and 100.
+    // The is_buffering indicator is TRUE when the buffering is in progress.
+    gst_query_parse_buffering_percent(query, &is_buffering, &percent);
+    GMP_DEBUG_PRINT("is_buffering[%d] percent[%d]", is_buffering, percent);
+
+    // amount of buffering time left in milliseconds.
+    gst_query_parse_buffering_stats(query, NULL, NULL, NULL, &buffering_left);
+    GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%d sec]",
             buffering_left, buffering_left / 1000);
 
-  position = GST_TIME_AS_MSECONDS(player->current_position_);
-  duration = GST_TIME_AS_MSECONDS(player->duration_);
+    position = GST_TIME_AS_MSECONDS(current_position_);
+    duration = GST_TIME_AS_MSECONDS(duration_);
 
-  buffered_time = player->queue2MaxSizeMsec - buffering_left + position;
-  GMP_DEBUG_PRINT("preBuffered_time[%" G_GINT64_FORMAT " ms] buffered_time[%" G_GINT64_FORMAT " ms]",
-              player->buffered_time_, buffered_time);
+    buffering_time = queue2MaxSizeMsec - buffering_left + position;
+    GMP_DEBUG_PRINT("preBuffered_time[%" G_GINT64_FORMAT " ms] buffering_time[%" G_GINT64_FORMAT " ms]",
+            buffered_time_, buffering_time);
 
-  // FIXME: it's inacuurate. sometimes buffered_time is reduced during buffering.
-  if (player->buffered_time_ > buffered_time)
-    buffered_time = player->buffered_time_;
+    // sometimes buffering_time is reduced during buffering.
+    // so we need to update maximum buffering time.
+    if (buffered_time_ > buffering_time) {
+      buffering_time = buffered_time_;
+    }
 
-  if (buffered_time > duration) {
-    fully_buffered = true;
-    buffered_time = duration;
+    if (buffering_time > duration) {
+      buffering_time = duration;
+    }
+    gst_query_unref(query);
   }
 
-  GMP_DEBUG_PRINT("buffered_time[%" G_GINT64_FORMAT " ms] -> [%d sec]",
-                    buffered_time, buffered_time / 1000);
+  buffered_time_ = buffering_time;
+
+  GMP_DEBUG_PRINT("buffering_time[%" G_GINT64_FORMAT " ms] -> [%d sec]",
+                    buffering_time, buffering_time / 1000);
 
   /*
    * beginTime = ms
@@ -584,20 +630,12 @@ gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
    * remainingTime = ms
    * percent = int
    */
-  base::buffer_range_t bufferRange;
   bufferRange.beginTime = position;
-  bufferRange.endTime = buffered_time / 1000;
-  bufferRange.remainingTime = buffered_time - position;
+  bufferRange.endTime = buffering_time / 1000;
+  bufferRange.remainingTime = buffering_time - position;
   bufferRange.percent = percent;
 
-  GMP_DEBUG_PRINT("beginTime[%" G_GINT64_FORMAT " ms] bufferEndTime[%d sec] buffered_time[%" G_GINT64_FORMAT " ms] percent[%d]",
-                  position, buffered_time / 1000, buffered_time - position, percent);
-
-  player->buffered_time_ = buffered_time;
-  player->service_->Notify(NOTIFY_BUFFER_RANGE, &bufferRange);
-  gst_query_unref(query);
-
-  return true;
+  return bufferRange;
 }
 
 base::error_t UriPlayer::HandleErrorMessage(GstMessage *message) {

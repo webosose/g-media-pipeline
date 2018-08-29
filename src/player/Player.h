@@ -23,6 +23,7 @@
 #include <string>
 #include <memory>
 #include <thread>
+#include <mutex>
 #include <gst/player/player.h>
 #include <gst/pbutils/pbutils.h>
 
@@ -89,8 +90,13 @@ class UriPlayer : public Player {
   base::error_t HandleErrorMessage(GstMessage *message);
   int32_t ConvertErrorCode(GQuark domain, gint code);
   void SetGstreamerDebug();
-  base::playback_state_t GetPlayerState() const { return current_state_; }
+  base::buffer_range_t CalculateBufferingTime();
+  base::playback_state_t GetPlayerState() const {
+    std::lock_guard<std::mutex> lock(state_lock_);
+    return current_state_;
+  }
   bool SetPlayerState(base::playback_state_t state) {
+    std::lock_guard<std::mutex> lock(state_lock_);
     current_state_ = state;
     return true;
   }
@@ -103,11 +109,14 @@ class UriPlayer : public Player {
   std::string connectID_;
   int32_t planeId_;
   bool httpSource_;
+  mutable std::mutex state_lock_;
+  std::mutex lock_;
 
   /* buffering variable */
   GstElement *queue2_;
   guint bufferingTimer_id_;
   bool buffering_;
+  bool buffering_time_updated_;
   gint64 buffered_time_;
   base::playback_state_t current_state_;
   const gint queue2MaxSizeBytes = 24 * 1024 * 1024;
