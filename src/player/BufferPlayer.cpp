@@ -146,6 +146,12 @@ bool BufferPlayer::Unload() {
   if (isUnloaded_)
     return true;
 
+  for (auto mediaSrc : sourceInfo_) {
+    if (!mediaSrc)
+      delete mediaSrc;
+  }
+  sourceInfo_.clear();
+
   if (pipeline_) {
     gst_element_set_state(pipeline_, GST_STATE_NULL);
     gst_object_unref(GST_OBJECT(pipeline_));
