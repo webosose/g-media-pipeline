@@ -20,6 +20,9 @@
 #include <type_traits>
 #include <pbnjson.hpp>
 #include <string>
+#include <regex>
+#include <gst/gst.h>
+#include "log/log.h"
 
 namespace gmp { namespace parser {
 
@@ -107,8 +110,39 @@ class Parser {
     return val;
   }
 
+  gint64 get_start_time(void) {
+    gint64 start_time = 0;
+    for(auto i = _dom.begin(); i != _dom.end(); ++i) {
+      _serialized = pbnjson::JGenerator::serialize((*i).second, true);
+
+      try {
+        std::regex re("\\w+");
+        std::sregex_iterator next(_serialized.begin(), _serialized.end(), re);
+        std::sregex_iterator end;
+        while (next != end) {
+          std::smatch match = *next;
+          if (match.str() == "start") {
+            ++next;
+            match = *next;
+            start_time = std::stoll(match.str(), NULL, 10);
+            break;
+          }
+          ++next;
+        }
+      } catch (std::regex_error& e) {
+        GMP_DEBUG_PRINT("Syntax error in the regular expression");
+      }
+
+      if (start_time > 0)
+        break;
+    }
+
+    return start_time * GST_USECOND;
+  }
+
  private:
   pbnjson::JValue _dom;
+  std::string _serialized;
 };
 
 }  // namespace parser

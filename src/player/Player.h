@@ -42,7 +42,9 @@ class Player {
     , duration_(0)
     , load_complete_(false)
     , seeking_(false)
-    , current_position_(0) {}
+    , current_position_(0)
+    , reloading_(false)
+    , reload_seek_position_(0) {}
   virtual ~Player() {}
 
   virtual bool Load(const std::string & uri) = 0;
@@ -54,6 +56,9 @@ class Player {
   virtual bool SetVolume(int volume) = 0;
   virtual bool SetPlane(int planeId) = 0;
   virtual void Initialize(gmp::service::IService *service) = 0;
+
+  bool reloading_;
+  gint64 reload_seek_position_;
 
  protected:
   GstElement *pipeline_;

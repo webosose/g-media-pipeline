@@ -361,15 +361,26 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
 
     case GST_MESSAGE_ASYNC_DONE: {
       GMP_DEBUG_PRINT("ASYNC DONE");
-      std::lock_guard<std::mutex> lock(player->lock_);
 
-      if (!player->load_complete_) {
+      auto notify_case = NOTIFY_MAX;
+
+      {
+        std::lock_guard<std::mutex> lock(player->lock_);
+
+        if (!player->load_complete_) {
+          player->load_complete_ = true;
+          notify_case = NOTIFY_LOAD_COMPLETED;
+        } else if (player->seeking_) {
+          player->seeking_ = false;
+          player->buffering_time_updated_ = true;
+          notify_case = NOTIFY_SEEK_DONE;
+        }
+      }
+
+      if (notify_case == NOTIFY_LOAD_COMPLETED) {
         player->service_->Notify(NOTIFY_LOAD_COMPLETED);
-        player->load_complete_ = true;
-      } else if (player->seeking_) {
+      } else if (notify_case == NOTIFY_SEEK_DONE) {
         player->service_->Notify(NOTIFY_SEEK_DONE);
-        player->seeking_ = false;
-        player->buffering_time_updated_ = true;
       }
 
       break;

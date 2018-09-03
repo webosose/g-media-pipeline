@@ -59,6 +59,14 @@ void Service::Notify(const NOTIFY_TYPE_T notification) {
         g_free(message);
         // TODO(someone) : check the need
         // res_requestor_->mediaContentReady(true);
+
+        if (instance_->player_->reloading_) {
+          gint64 start_time = instance_->player_->reload_seek_position_;
+          instance_->player_->reloading_ = false;
+          instance_->player_->reload_seek_position_ = 0;
+          instance_->player_->Seek(start_time);
+        }
+
         break;
     }
 
@@ -284,6 +292,7 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
     bool ret = false;
     gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
     instance_->media_id_ = parser.get<std::string>("id");
+    gint64 start_time = parser.get_start_time();
     instance_->res_requestor_ = std::make_shared<gmp::resource::ResourceRequestor>("media", instance_->media_id_);
     // TODO(someone) : check the need
     // instance_->res_requestor_->notifyForeground();
@@ -301,6 +310,13 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
             return true;
             });
     ret = instance_->player_->Load(parser.get<std::string>("uri"));
+
+    if (ret && (start_time>0)) {
+      GMP_DEBUG_PRINT("Reloading. Seek to [%lld]", start_time);
+      instance_->player_->reloading_ = true;
+      instance_->player_->reload_seek_position_ = start_time;
+    }
+
     return ret;
 }
 
