@@ -147,7 +147,7 @@ bool BufferPlayer::Unload() {
     return true;
 
   for (auto mediaSrc : sourceInfo_) {
-    if (!mediaSrc)
+    if (mediaSrc)
       delete mediaSrc;
   }
   sourceInfo_.clear();
