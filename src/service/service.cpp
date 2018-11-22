@@ -261,29 +261,33 @@ bool Service::Stop() {
   return umc_->stop();
 }
 
-bool Service::acquire(gmp::base::source_info_t &source_info) {
+bool Service::acquire(gmp::base::source_info_t &source_info, const int32_t display_path) {
   gmp::resource::PortResource_t resourceMMap;
-  int plane_id = -1;
+  gmp::base::disp_res_t dispRes = {-1,-1,-1};
 
   res_requestor_->setSourceInfo(source_info);
 
-  if (!res_requestor_->acquireResources(NULL, resourceMMap)) {
+  if (!res_requestor_->acquireResources(NULL, resourceMMap, dispRes, display_path)) {
     GMP_DEBUG_PRINT("resource acquisition failed");
     return false;
   }
 
   for (auto it : resourceMMap) {
     GMP_DEBUG_PRINT("Got Resource - name:%s, index:%d", it.first.c_str(), it.second);
-    if (it.first.substr(0, 4) == "DISP") {
-      plane_id = kPlaneMap[it.second];
-      break;
-    }
   }
 
+  if (dispRes.plane_id > 0 && dispRes.crtc_id > 0 && dispRes.conn_id > 0)
+    //player_->SetPlane(dispRes.plane_id);
+    player_->SetDisplayResource(dispRes);
+  else {
+    GMP_DEBUG_PRINT("ERROR : Failed to get displayResource(%d,%d,%d)", dispRes.plane_id, dispRes.crtc_id, dispRes.conn_id);
+    return false;
+  }
+/*
   if (plane_id > 0)
     player_->SetPlane(plane_id);
-
-  GMP_DEBUG_PRINT("resource acquired!!!, plane_id: %d", plane_id);
+*/
+  GMP_DEBUG_PRINT("resource acquired!!!, plane_id: %d, crtc_id: %d, conn_id: %d", dispRes.plane_id, dispRes.crtc_id, dispRes.conn_id);
   return true;
 }
 
@@ -304,12 +308,18 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
             instance_->player_->Unload();
             });
 
+/*
     instance_->res_requestor_->registerPlaneIdCallback([=] (int32_t planeId) -> bool {
             GMP_DEBUG_PRINT("registerPlaneIdCallback planeId:%d", planeId);
             instance_->player_->SetPlane(planeId);
             return true;
             });
-    ret = instance_->player_->Load(parser.get<std::string>("uri"));
+*/
+    std::string msg = instance_->umc_->getMessageText(message);
+    GMP_DEBUG_PRINT("LoadEvent: [%s]", msg.c_str());
+
+    ret = instance_->player_->Load(msg);
+
 
     if (ret && (start_time>0)) {
       GMP_DEBUG_PRINT("Reloading. Seek to [%lld]", start_time);
@@ -396,12 +406,15 @@ bool Service::SetVolumeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *me
 }
 
 bool Service::SetPlaneEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+/*
   GMP_DEBUG_PRINT("SetPlaneEvent");
   int planeID = -1;
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
   planeID = parser.get<int>("planeID");
   GMP_DEBUG_PRINT("setPlaneEvent player:%p, planeId:%d", instance_->player_, planeID);
   return instance_->player_->SetPlane(planeID);
+*/
+  return true;
 }
 
 // Resource Manager API

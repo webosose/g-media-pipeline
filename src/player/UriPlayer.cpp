@@ -34,6 +34,7 @@ UriPlayer::UriPlayer()
     positionTimer_id_(0),
     bufferingTimer_id_(0),
     planeId_(-1),
+    display_path_(0),
     queue2_(NULL),
     buffering_(false),
     buffering_time_updated_(false),
@@ -47,13 +48,10 @@ UriPlayer::~UriPlayer() {
   gst_deinit();
 }
 
-bool UriPlayer::Load(const std::string &uri) {
-  if (uri.empty()) {
-    GMP_DEBUG_PRINT("Uri is empty!");
-    return false;
-  }
-  GMP_DEBUG_PRINT("load: %s", uri.c_str());
-  uri_ = uri;
+bool UriPlayer::Load(const std::string &str) {
+  GMPASSERT(!str.empty());
+  GMP_DEBUG_PRINT("load: %s", str.c_str());
+  ParseOptionString(str);
   SetGstreamerDebug();
   gst_init(NULL, NULL);
   gst_pb_utils_init();
@@ -63,7 +61,7 @@ bool UriPlayer::Load(const std::string &uri) {
   }
   // TODO(someone): check return value of acquire.
   // Should use wxh value for acquire.
-  if (!service_->acquire(source_info_)) {
+  if (!service_->acquire(source_info_, display_path_)) {
     GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }
@@ -245,6 +243,14 @@ bool UriPlayer::SetPlane(int planeId) {
   GMP_DEBUG_PRINT("setPlane planeId:(%d)", planeId);
   planeId_ = planeId;
 
+  return true;
+}
+
+bool UriPlayer::SetDisplayResource(gmp::base::disp_res_t &res) {
+  GMP_DEBUG_PRINT("setDisplayResource planeId:(%d), crtcId:(%d), connId(%d)", res.plane_id, res.crtc_id, res.conn_id);
+  planeId_ = res.plane_id;
+  crtcId_ = res.crtc_id;
+  connId_ = res.conn_id;
   return true;
 }
 
@@ -526,20 +532,28 @@ bool UriPlayer::LoadPipeline() {
     GMP_DEBUG_PRINT("Cannot create sink element!");
     return false;
   }
+#ifdef PLATFORM_RASPBERRYPI3
   g_object_set(G_OBJECT(vSink), "driver-name", "vc4", NULL);
   g_object_set(G_OBJECT(aSink), "device", "hw:0,0", NULL);
-
+#endif
   g_object_set(G_OBJECT(pipeline_), "uri", uri_.c_str(),
                                     "video-sink", vSink,
                                     "audio-sink", aSink, NULL);
 
-  if (planeId_ > 0)
+  if (planeId_ > 0) {
+    GMP_DEBUG_PRINT("Plane Id setting with %d",planeId_);
     g_object_set(G_OBJECT(vSink), "plane-id", planeId_, NULL);
+  }
+
+  if (connId_ > 0) {
+    GMP_DEBUG_PRINT("Conn Id setting with %d",connId_);
+    g_object_set(G_OBJECT(vSink), "connector-id", connId_, NULL);
+  }
 
   GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline_));
   gst_bus_add_watch(bus, UriPlayer::HandleBusMessage, this);
   gst_object_unref(bus);
-
+  GMP_DEBUG_PRINT("LoadPipeline Done");
   return gst_element_set_state(pipeline_, GST_STATE_PAUSED);
 }
 
@@ -741,6 +755,25 @@ void UriPlayer::SetGstreamerDebug() {
     if (debug[i].hasKey(kDebugDot) && !debug[i][kDebugDot].asString().empty())
       setenv(kDebugDot, debug[i][kDebugDot].asString().c_str(), 1);
   }
+}
+
+void UriPlayer::ParseOptionString(const std::string &str) {
+  GMP_DEBUG_PRINT("option string: %s", str.c_str());
+
+  pbnjson::JDomParser jdparser;
+  if (!jdparser.parse(str, pbnjson::JSchema::AllSchema())) {
+    GMP_DEBUG_PRINT("ERROR JDomParser.parse. msg: %s ", str.c_str());
+    return;
+  }
+  pbnjson::JValue parsed = jdparser.getDom();
+
+  uri_ = parsed["uri"].asString();
+  if (parsed["options"]["option"].hasKey("display-path")) {
+    int32_t display_path = parsed["options"]["option"]["display-path"].asNumber<int32_t>();
+    display_path_ = (display_path >= MAX_NUM_DISPLAY ? 0 : display_path);
+  }
+
+  GMP_DEBUG_PRINT("uri: %s, display-path: %d", uri_.c_str(), display_path_);
 }
 
 }  // namespace player

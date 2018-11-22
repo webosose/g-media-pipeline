@@ -17,11 +17,6 @@
 #ifndef SRC_PLAYER_PLAYERTYPES_H_
 #define SRC_PLAYER_PLAYERTYPES_H_
 
-#define PLANE_MAP_SIZE 4
-
-  // plane 51 is used for LSM. So we have to avoid using plane 51.
-static int kPlaneMap[PLANE_MAP_SIZE] = { 47, 46, 45, 44 };
-
 typedef void (*GMP_CALLBACK_FUNCTION_T)(const gint type, const gint64 numValue, const gchar *strValue, void *udata);
 typedef void (*GMP_EVENT_CALLBACK_T)(int type, int64_t num, const char *str, void *data);
 
@@ -125,7 +120,7 @@ typedef struct MEDIA_LOAD_DATA {
   guint32 height;
   void*   extraData;
   guint32 extraSize;
-
+  guint32 displayPath;  /* to support multi display, 0(default) for primary, 1 for secondary display */
   /* config for audio */
   guint32 channels;
   guint32 sampleRate;

@@ -44,8 +44,9 @@ bool MediaPlayerClient::Load(const MEDIA_LOAD_DATA_T* loadData) {
 
   player_->Initialize(NULL);
 
+  uint32_t display_path = (loadData->displayPath >= MAX_NUM_DISPLAY) ? 0 : loadData->displayPath;
   base::source_info_t source_info = GetSourceInfo(loadData);
-  if (!player_->AcquireResources(source_info)) {
+  if (!player_->AcquireResources(source_info, display_path)) {
     GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }

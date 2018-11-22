@@ -47,7 +47,7 @@ class Player {
     , reload_seek_position_(0) {}
   virtual ~Player() {}
 
-  virtual bool Load(const std::string & uri) = 0;
+  virtual bool Load(const std::string &str) = 0;
   virtual bool Unload() = 0;
   virtual bool Play() = 0;
   virtual bool Pause() = 0;
@@ -55,6 +55,7 @@ class Player {
   virtual bool Seek(const int64_t position) = 0;
   virtual bool SetVolume(int volume) = 0;
   virtual bool SetPlane(int planeId) = 0;
+  virtual bool SetDisplayResource(gmp::base::disp_res_t &res) = 0;
   virtual void Initialize(gmp::service::IService *service) = 0;
 
   bool reloading_;
@@ -74,7 +75,7 @@ class UriPlayer : public Player {
  public:
   UriPlayer();
   ~UriPlayer();
-  bool Load(const std::string &uri) override;
+  bool Load(const std::string &str) override;
   bool Unload() override;
   bool Play() override;
   bool Pause() override;
@@ -82,6 +83,7 @@ class UriPlayer : public Player {
   bool Seek(const int64_t position) override;
   bool SetVolume(int volume) override;
   bool SetPlane(int planeId) override;
+  bool SetDisplayResource(gmp::base::disp_res_t &res) override;
   void Initialize(gmp::service::IService *service) override;
   static gboolean HandleBusMessage(GstBus *bus,
                                    GstMessage *message, gpointer user_data);
@@ -105,14 +107,17 @@ class UriPlayer : public Player {
     current_state_ = state;
     return true;
   }
+  void ParseOptionString(const std::string &str);
 
- private:
   base::source_info_t source_info_;
   std::string uri_;
   guint positionTimer_id_;
   std::shared_ptr<gmp::resource::ResourceRequestor> res_requestor_;
   std::string connectID_;
   int32_t planeId_;
+  int32_t crtcId_;
+  int32_t connId_;
+  int32_t display_path_;
   bool httpSource_;
   mutable std::mutex state_lock_;
   std::mutex lock_;

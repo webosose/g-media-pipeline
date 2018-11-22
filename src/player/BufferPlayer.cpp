@@ -308,6 +308,14 @@ bool BufferPlayer::SetPlane(int planeId) {
   return true;
 }
 
+bool BufferPlayer::SetDisplayResource(gmp::base::disp_res_t &res) {
+  GMP_DEBUG_PRINT("setDisplayResource planeId:(%d), crtcId:(%d), connId(%d)", res.plane_id, res.crtc_id, res.conn_id);
+  planeId_ = res.plane_id;
+  crtcId_ = res.crtc_id;
+  connId_ = res.conn_id;
+  return true;
+}
+
 void BufferPlayer::Initialize(gmp::service::IService *service) {
   GMP_DEBUG_PRINT("service(%p)", service);
   SetGstreamerDebug();
@@ -318,9 +326,9 @@ void BufferPlayer::Initialize(gmp::service::IService *service) {
   GMP_DEBUG_PRINT("END");
 }
 
-bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo) {
+bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo, uint32_t display_path) {
   gmp::resource::PortResource_t resourceMMap;
-  int planeId = -1;
+  gmp::base::disp_res_t dispRes = {-1,-1,-1};
 
   resourceRequestor_->notifyForeground();
 
@@ -330,33 +338,37 @@ bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo) {
           if (notifyFunction_)
             notifyFunction_(NOTIFY_ERROR, GMP_ERROR_RES_ALLOC, NULL, userData_);
       });
+/*
   resourceRequestor_->registerPlaneIdCallback( [this] (int32_t planeId)->bool {
        GMP_DEBUG_PRINT("registerPlaneIdCallback PlaneId = %d", planeId);
        planeId_ = planeId;
        return true;
      });
-
+*/
   resourceRequestor_->setSourceInfo(sourceInfo);
 
-  if (!resourceRequestor_->acquireResources(NULL, resourceMMap)) {
+  if (!resourceRequestor_->acquireResources(NULL, resourceMMap, dispRes, display_path)) {
     GMP_DEBUG_PRINT("resource acquisition failed");
     return false;
   }
 
   for (auto it : resourceMMap) {
     GMP_DEBUG_PRINT("Resource::[%s]=>index:%d", it.first.c_str(), it.second);
-    if (it.first.substr(0, 4) == "DISP") {
-      planeId = kPlaneMap[it.second];
-      break;
-    }
   }
-
+/*
   if (planeId > 0)
     SetPlane(planeId);
-
+*/
   UpdateVideoResData(sourceInfo);
 
-  GMP_DEBUG_PRINT("resource acquired!!!, planeId: %d", planeId);
+  if (dispRes.plane_id > 0 && dispRes.crtc_id > 0 && dispRes.conn_id > 0)
+    //player_->SetPlane(dispRes.plane_id);
+    SetDisplayResource(dispRes);
+  else {
+    GMP_DEBUG_PRINT("ERROR : Failed to get displayResource(%d,%d,%d)", dispRes.plane_id, dispRes.crtc_id, dispRes.conn_id);
+    return false;
+  }
+  GMP_DEBUG_PRINT("resource acquired!!!, planeId: %d", planeId_);
   return true;
 }
 
@@ -987,6 +999,11 @@ bool BufferPlayer::AddSinkElements() {
   if (!planeIdSet_ && planeId_ > 0) {
     g_object_set(G_OBJECT(videoSink_), "plane-id", planeId_, NULL);
     planeIdSet_ = true;
+  }
+  
+  GMP_DEBUG_PRINT("connId_ = %d", connId_);
+  if (connId_ > 0) {
+    g_object_set(G_OBJECT(videoSink_), "connector-id", connId_, NULL);
   }
 
   GMP_DEBUG_PRINT("Audio/Video sink elements are Added!!!");

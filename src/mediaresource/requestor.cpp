@@ -92,14 +92,14 @@ void ResourceRequestor::ResourceRequestorInit() {
   if ("" == connectionId_) {
     GMPASSERT(0);
   }
-
+/*
   if (nullptr != umsMDCCR_) {
     bool res = umsMDCCR_->registerPlaneIdCallback(std::bind(&ResourceRequestor::planeIdHandler,
           this,
           std::placeholders::_1));
     GMP_DEBUG_PRINT("PlaneID callback register : %s", res ? "success!" : "fail!");
   }
-
+*/
   umsRMC_->registerPolicyActionHandler(
       std::bind(&ResourceRequestor::policyActionHandler,
         this,
@@ -135,7 +135,8 @@ ResourceRequestor::~ResourceRequestor() {
   }
 }
 
-bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortResource_t& resourceMMap) {
+bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMap, gmp::base::disp_res_t & res, const int32_t display_path) {
+
   // ResourceCaculator & ResourceManager is changed in WebOS 3.0
   mrc::ResourceList AResource;
   mrc::ResourceList audioOptions;
@@ -189,7 +190,7 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
   for (auto option : finalOptions) {
     for (auto it : option) {
       JValue obj = pbnjson::Object();
-      obj.put("resource", it.type);
+      obj.put("resource", it.type + (it.type == "DISP" ? to_string(display_path) : ""));
       obj.put("qty", it.quantity);
       GMP_DEBUG_PRINT("calculator return : %s, %d", it.type.c_str(), it.quantity);
       objArray << obj;
@@ -210,7 +211,7 @@ bool ResourceRequestor::acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortR
   GMP_DEBUG_PRINT("acquire response:%s", response.c_str());
 
   try {
-    parsePortInformation(response, resourceMMap);
+    parsePortInformation(response, resourceMMap, res);
     parseResources(response, acquiredResource_);
   } catch (const std::runtime_error & err) {
     GMP_DEBUG_PRINT("[%s:%d] err=%s, response:%s",
@@ -278,7 +279,7 @@ bool ResourceRequestor::policyActionHandler(const char *action,
   return allowPolicy_;
 }
 
-bool ResourceRequestor::parsePortInformation(const std::string& payload, PortResource_t& resourceMMap) {
+bool ResourceRequestor::parsePortInformation(const std::string& payload, PortResource_t& resourceMMap, gmp::base::disp_res_t & res) {
   JDomParser parser;
   JSchemaFragment input_schema("{}");
   if (!parser.parse(payload, input_schema)) {
@@ -291,9 +292,16 @@ bool ResourceRequestor::parsePortInformation(const std::string& payload, PortRes
   }
 
   for (int i=0; i < parsed["resources"].arraySize(); ++i) {
-    resourceMMap.insert(std::make_pair(parsed["resources"][i]["resource"].asString(),
-          parsed["resources"][i]["index"].asNumber<int32_t>()));
+    string resource = parsed["resources"][i]["resource"].asString();
+    int32_t value = parsed["resources"][i]["index"].asNumber<int32_t>();
+    if (resource.find("DISP") != string::npos) {
+      res.plane_id = parsed["resources"][i]["plane-id"].asNumber<int32_t>();
+      res.crtc_id = parsed["resources"][i]["crtc-id"].asNumber<int32_t>();
+      res.conn_id = parsed["resources"][i]["conn-id"].asNumber<int32_t>();
+    }
+    resourceMMap.insert(std::make_pair(resource, value));
   }
+
 
   for (auto& it : resourceMMap) {
     GMP_DEBUG_PRINT("port Resource - %s, : [%d] ", it.first.c_str(), it.second);

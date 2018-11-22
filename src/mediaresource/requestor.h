@@ -79,7 +79,7 @@ class ResourceRequestor {
 
   void unregisterWithMDC();
 
-  bool acquireResources(/*NDL_ESP_META_DATA*/ void* meta, PortResource_t& resourceMMap);
+  bool acquireResources(void* meta, PortResource_t& resourceMMap, gmp::base::disp_res_t & res, const int32_t display_path = 0);
 
   bool releaseResource();
 
@@ -122,7 +122,7 @@ class ResourceRequestor {
       const char *connectionId);
   void planeIdHandler(int32_t planePortIdx);
 
-  bool parsePortInformation(const std::string& payload, PortResource_t& resourceMMap);
+  bool parsePortInformation(const std::string& payload, PortResource_t& resourceMMap, gmp::base::disp_res_t & res);
   bool parseResources(const std::string& payload, std::string& resources);
 
   // translate enum type from omx player to resource calculator

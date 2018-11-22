@@ -59,9 +59,10 @@ class BufferPlayer : public Player {
     bool Seek(const int64_t position) override;
     bool SetVolume(int volume) override;
     bool SetPlane(int planeId) override;
+    bool SetDisplayResource(gmp::base::disp_res_t &res) override;
     void Initialize(gmp::service::IService* service) override;
 
-    bool AcquireResources(gmp::base::source_info_t &sourceInfo);
+    bool AcquireResources(gmp::base::source_info_t &sourceInfo, uint32_t display_path = 0);
     bool ReleaseResources();
 
     bool Load(const MEDIA_LOAD_DATA_T* loadData);
@@ -154,6 +155,8 @@ class BufferPlayer : public Player {
     gulong gSigBusAsync_;
 
     int32_t planeId_;
+    int32_t crtcId_;
+    int32_t connId_;
     bool planeIdSet_;
 
     bool isUnloaded_;

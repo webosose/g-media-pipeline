@@ -87,6 +87,12 @@ struct buffer_range_t {
   int64_t percent;
 };
 
+struct disp_res_t {
+  int32_t plane_id;
+  int32_t crtc_id;
+  int32_t conn_id;
+};
+
 }  // namespace base
 }  // namespace gmp
 

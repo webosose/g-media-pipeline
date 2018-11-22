@@ -40,7 +40,7 @@ class IService {
   virtual void Notify(const NOTIFY_TYPE_T notification, const void *payload) = 0;
   virtual bool Wait() = 0;
   virtual bool Stop()= 0;
-  virtual bool acquire(gmp::base::source_info_t   &source_info) = 0;
+  virtual bool acquire(gmp::base::source_info_t   &source_info, const int32_t display_path = 0) = 0;
 };
 
 class Service : public IService {
@@ -54,7 +54,7 @@ class Service : public IService {
   bool Wait() override;
   bool Stop() override;
   void Initialize(gmp::player::Player *player);
-  bool acquire(gmp::base::source_info_t   &source_info) override;
+  bool acquire(gmp::base::source_info_t   &source_info, const int32_t display_path = 0) override;
 
   // uMediaserver public API
   static bool LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);

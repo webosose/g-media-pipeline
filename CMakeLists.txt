@@ -34,6 +34,14 @@ if (NOT DEFINED ENV{PKG_CONFIG_PATH})
   set(ENV{PKG_CONFIG_PATH} ${WEBOS_INSTALL_ROOT}usr/share/pkgconfig)
 endif()
 
+if(${WEBOS_TARGET_MACHINE} STREQUAL "raspberrypi3" OR ${WEBOS_TARGET_MACHINE} STREQUAL "raspberrypi3-64")
+  message(STATUS "Build g-media-pipeline for raspberrypi3")
+  add_definitions(-DPLATFORM_RASPBERRYPI3)
+  add_definitions(-DMAX_NUM_DISPLAY=1)
+else()
+  message(FATAL_ERROR "Check WEBOS_TARGET_MACHINE: " ${WEBOS_TARGET_MACHINE})
+endif()
+
 file(GLOB_RECURSE HEADERS "*.h*")
 add_custom_target(show_headers SOURCES ${HEADERS})
 
