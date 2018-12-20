@@ -52,12 +52,6 @@
 #define BUFFER_MIN_PERCENT 50
 #define MEDIA_CHANNEL_MAX  2
 
-#ifdef GMP_DEBUG_PRINT
-#undef GMP_DEBUG_PRINT
-#endif
-
-#define GMP_DEBUG_PRINT GMP_INFO_PRINT
-
 namespace {
 
 bool IsElementName(const GstElement *element, const char *name) {
