@@ -534,7 +534,6 @@ bool UriPlayer::LoadPipeline() {
   }
 #ifdef PLATFORM_RASPBERRYPI3
   g_object_set(G_OBJECT(vSink), "driver-name", "vc4", NULL);
-  g_object_set(G_OBJECT(aSink), "device", "hw:0,0", NULL);
 #endif
   g_object_set(G_OBJECT(pipeline_), "uri", uri_.c_str(),
                                     "video-sink", vSink,
