@@ -218,14 +218,7 @@ void Service::Initialize(gmp::player::Player *player) {
     {"seek", Service::SeekEvent},
     {"stateChange", Service::StateChangeEvent},
     {"unsubscribe", Service::UnsubscribeEvent},
-    {"setUri", Service::SetUriEvent},
     {"setPlayRate", Service::SetPlayRateEvent},
-    {"selectTrack", Service::SelectTrackEvent},
-    {"setUpdateInterval", Service::SetUpdateIntervalEvent},
-    {"setUpdateIntervalKV", Service::SetUpdateIntervalKVEvent},
-    {"changeResolution", Service::ChangeResolutionEvent},
-    {"setStreamQuality", Service::SetStreamQualityEvent},
-    {"setProperty", Service::SetPropertyEvent},
     {"setVolume", Service::SetVolumeEvent},
     {"setPlane", Service::SetPlaneEvent},
 
@@ -240,14 +233,6 @@ void Service::Initialize(gmp::player::Player *player) {
     {"notifyActivity", Service::NotifyActivityEvent},
     {"trackAppProcesses", Service::TrackAppProcessesEvent},
 
-    // pipeline state query API
-    {"getPipelineState", Service::GetPipelineStateEvent},
-    {"logPipelineState", Service::LogPipelineStateEvent},
-    {"getActivePipelines", Service::GetActivePipelinesEvent},
-    {"setPipelineDebugState", Service::SetPipelineDebugStateEvent},
-
-    // exit
-    {"exit", Service::ExitEvent},
     {NULL, NULL}};
 
   umc_->addEventHandlers(reinterpret_cast<UMSConnectorEventHandler *>(event_handlers));
@@ -365,38 +350,10 @@ bool Service::UnsubscribeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *
   return true;
 }
 
-bool Service::SetUriEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
 bool Service::SetPlayRateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   GMP_DEBUG_PRINT("SetPlayRateEvent");
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
   return instance_->player_->SetPlayRate(parser.get<double>("playRate"));
-}
-
-bool Service::SelectTrackEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::SetUpdateIntervalEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::SetUpdateIntervalKVEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::ChangeResolutionEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::SetStreamQualityEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::SetPropertyEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
 }
 
 bool Service::SetVolumeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
@@ -454,26 +411,5 @@ bool Service::TrackAppProcessesEvent(UMSConnectorHandle *handle, UMSConnectorMes
   return true;
 }
 
-// pipeline state query API
-bool Service::GetPipelineStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::LogPipelineStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::GetActivePipelinesEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::SetPipelineDebugStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-// exit
-bool Service::ExitEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return instance_->umc_->stop();
-}
 }  // namespace service
 }  // namespace gmp

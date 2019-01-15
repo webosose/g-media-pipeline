@@ -116,18 +116,6 @@ void ResourceRequestor::unregisterWithMDC() {
   }
 }
 
-bool ResourceRequestor::endOfStream() {
-  return umsMDC_->updatePlaybackState(PLAYBACK_STOPPED);
-}
-
-bool ResourceRequestor::enableScreenSaver() {
-  return umsMDC_->updatePlaybackState(PLAYBACK_PAUSED);
-}
-
-bool ResourceRequestor::disableScreenSaver() {
-  return umsMDC_->updatePlaybackState(PLAYBACK_PLAYING);
-}
-
 ResourceRequestor::~ResourceRequestor() {
   if (!acquiredResource_.empty()) {
     umsRMC_->release(acquiredResource_);
@@ -295,9 +283,9 @@ bool ResourceRequestor::parsePortInformation(const std::string& payload, PortRes
     string resource = parsed["resources"][i]["resource"].asString();
     int32_t value = parsed["resources"][i]["index"].asNumber<int32_t>();
     if (resource.find("DISP") != string::npos) {
-      res.plane_id = parsed["resources"][i]["plane-id"].asNumber<int32_t>();
-      res.crtc_id = parsed["resources"][i]["crtc-id"].asNumber<int32_t>();
-      res.conn_id = parsed["resources"][i]["conn-id"].asNumber<int32_t>();
+      res.plane_id = parsed["resources"][i]["display_attr"]["plane-id"].asNumber<int32_t>();
+      res.crtc_id = parsed["resources"][i]["display_attr"]["crtc-id"].asNumber<int32_t>();
+      res.conn_id = parsed["resources"][i]["display_attr"]["conn-id"].asNumber<int32_t>();
     }
     resourceMMap.insert(std::make_pair(resource, value));
   }

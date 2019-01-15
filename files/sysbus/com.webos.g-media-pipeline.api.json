@@ -10,14 +10,7 @@
         "com.webos.pipeline.*/seek",
         "com.webos.pipeline.*/stateChange",
         "com.webos.pipeline.*/unsubscribe",
-        "com.webos.pipeline.*/setUri",
         "com.webos.pipeline.*/setPlayRate",
-        "com.webos.pipeline.*/selectTrack",
-        "com.webos.pipeline.*/setUpdateInterval",
-        "com.webos.pipeline.*/setUpdateIntervalKV",
-        "com.webos.pipeline.*/changeResolution",
-        "com.webos.pipeline.*/setStreamQuality",
-        "com.webos.pipeline.*/setProperty",
         "com.webos.pipeline.*/setVolume",
         "com.webos.pipeline.*/setPlane"
     ]

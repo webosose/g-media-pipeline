@@ -83,10 +83,6 @@ class ResourceRequestor {
 
   bool releaseResource();
 
-  bool enableScreenSaver();
-  bool endOfStream();
-  bool disableScreenSaver();
-
   bool notifyForeground() const;
   bool notifyBackground() const;
   bool notifyActivity() const;

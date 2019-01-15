@@ -67,14 +67,7 @@ class Service : public IService {
   static bool SeekEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
   static bool StateChangeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
   static bool UnsubscribeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SetUriEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
   static bool SetPlayRateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SelectTrackEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SetUpdateIntervalEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SetUpdateIntervalKVEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool ChangeResolutionEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SetStreamQualityEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SetPropertyEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
   static bool SetVolumeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
   static bool SetPlaneEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
 
@@ -89,15 +82,6 @@ class Service : public IService {
   static bool NotifyActivityEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
   static bool TrackAppProcessesEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
 
-  // pipeline state query API
-  static bool GetPipelineStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool LogPipelineStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool GetActivePipelinesEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-  static bool SetPipelineDebugStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-
-  // exit
-  static bool ExitEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt);
-
  private:
   explicit Service(const char *service_name);
 
@@ -107,8 +91,6 @@ class Service : public IService {
   static Service *instance_;
   std::shared_ptr<gmp::resource::ResourceRequestor> res_requestor_;
 
-  // plane 51 is used for LSM. So we have to avoid using plane 51.
-  int kPlaneMap[PLANE_MAP_SIZE] = {47, 46, 45, 44};
 };
 
 }  // namespace service
