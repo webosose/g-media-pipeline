@@ -34,6 +34,8 @@ UriPlayer::UriPlayer()
     positionTimer_id_(0),
     bufferingTimer_id_(0),
     planeId_(-1),
+    crtcId_(-1),
+    connId_(-1),
     display_path_(0),
     queue2_(NULL),
     buffering_(false),
@@ -621,7 +623,7 @@ base::buffer_range_t UriPlayer::CalculateBufferingTime() {
 
     // amount of buffering time left in milliseconds.
     gst_query_parse_buffering_stats(query, NULL, NULL, NULL, &buffering_left);
-    GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%d sec]",
+    GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%" G_GINT64_FORMAT " sec]",
             buffering_left, buffering_left / 1000);
 
     position = GST_TIME_AS_MSECONDS(current_position_);
@@ -645,7 +647,7 @@ base::buffer_range_t UriPlayer::CalculateBufferingTime() {
 
   buffered_time_ = buffering_time;
 
-  GMP_DEBUG_PRINT("buffering_time[%" G_GINT64_FORMAT " ms] -> [%d sec]",
+  GMP_DEBUG_PRINT("buffering_time[%" G_GINT64_FORMAT " ms] -> [%" G_GINT64_FORMAT " sec]",
                     buffering_time, buffering_time / 1000);
 
   /*
