@@ -43,16 +43,20 @@ UriPlayer::UriPlayer()
     buffered_time_(-1),
     httpSource_(false),
     current_state_(base::playback_state_t::STOPPED) {
+  GMP_DEBUG_PRINT("START this[%p]", this);
 }
 
 UriPlayer::~UriPlayer() {
   Unload();
   gst_deinit();
+  GMP_DEBUG_PRINT("END this[%p]", this);
 }
 
 bool UriPlayer::Load(const std::string &str) {
-  GMPASSERT(!str.empty());
   GMP_DEBUG_PRINT("load: %s", str.c_str());
+
+  GMPASSERT(!str.empty());
+
   ParseOptionString(str);
   SetGstreamerDebug();
   gst_init(NULL, NULL);
@@ -61,12 +65,15 @@ bool UriPlayer::Load(const std::string &str) {
     GMP_DEBUG_PRINT("get source information failed!");
     return false;
   }
+
+#ifndef PLATFORM_QEMUX86
   // TODO(someone): check return value of acquire.
   // Should use wxh value for acquire.
   if (!service_->acquire(source_info_, display_path_)) {
     GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }
+#endif
 
   if (!LoadPipeline()) {
     GMP_DEBUG_PRINT("pipeline load failed!");
@@ -257,6 +264,7 @@ bool UriPlayer::SetDisplayResource(gmp::base::disp_res_t &res) {
 }
 
 void UriPlayer::Initialize(gmp::service::IService *service) {
+  GMP_DEBUG_PRINT("service = %p", service);
   if (!service)
     return;
 
@@ -351,6 +359,12 @@ void UriPlayer::NotifySourceInfo() {
 
 gboolean UriPlayer::HandleBusMessage(GstBus *bus,
                                      GstMessage *message, gpointer user_data) {
+  GstMessageType messageType = GST_MESSAGE_TYPE(message);
+  if (messageType != GST_MESSAGE_QOS && messageType != GST_MESSAGE_TAG) {
+    GMP_INFO_PRINT("Element[ %s ][ %d ][ %s ]", GST_MESSAGE_SRC_NAME(message),
+                    messageType, gst_message_type_get_name(messageType));
+  }
+
   // TODO(anonymous): handle more bus message
   UriPlayer *player = reinterpret_cast<UriPlayer *>(user_data);
 
@@ -527,16 +541,22 @@ bool UriPlayer::LoadPipeline() {
   g_signal_connect(G_OBJECT(pipeline_), "source-setup", G_CALLBACK(sourceSetupCB), this);
   g_signal_connect(G_OBJECT(pipeline_), "element-setup", G_CALLBACK(elementSetupCB), this);
 
-  GstElement *aSink = gst_element_factory_make("alsasink", NULL);
+  GstElement *aSink = gst_element_factory_make("alsasink", "audio-sink");
+#ifdef PLATFORM_QEMUX86
+  GstElement *vSink = gst_element_factory_make("waylandsink", "video-sink");
+#else
   GstElement *vSink = gst_element_factory_make("kmssink", NULL);
+#endif
 
   if (!aSink || !vSink) {
     GMP_DEBUG_PRINT("Cannot create sink element!");
     return false;
   }
-#ifdef PLATFORM_RASPBERRYPI3
+
+#ifndef PLATFORM_QEMUX86
   g_object_set(G_OBJECT(vSink), "driver-name", "vc4", NULL);
 #endif
+
   g_object_set(G_OBJECT(pipeline_), "uri", uri_.c_str(),
                                     "video-sink", vSink,
                                     "audio-sink", aSink, NULL);

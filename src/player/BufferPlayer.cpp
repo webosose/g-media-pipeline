@@ -86,6 +86,7 @@ BufferPlayer::BufferPlayer(const std::string& appId)
     audioPQueue_(NULL),
     audioParser_(NULL),
     videoDecoder_(NULL),
+    videoConverter_(NULL),
     vSinkQueue_(NULL),
     videoSink_(NULL),
     audioDecoder_(NULL),
@@ -95,6 +96,8 @@ BufferPlayer::BufferPlayer(const std::string& appId)
     busHandler_(NULL),
     gSigBusAsync_(0),
     planeId_(-1),
+    crtcId_(-1),
+    connId_(-1),
     planeIdSet_(false),
     isUnloaded_(false),
     recEndOfStream_(false),
@@ -105,29 +108,24 @@ BufferPlayer::BufferPlayer(const std::string& appId)
     loadData_(NULL),
     userData_(NULL),
     notifyFunction_(NULL) {
-  GMP_INFO_PRINT("START :: appId [ %s ]", appId.c_str());
-
   memset(&totalFeed_, 0x00, (sizeof(guint64)*IDX_MAX));
   memset(&needFeedData_, 0x00, (sizeof(CUSTOM_BUFFERING_STATE_T)*IDX_MAX));
 
   resourceRequestor_ =
       std::make_shared<gmp::resource::ResourceRequestor>(appId);
 
-  GMP_INFO_PRINT("END");
+  GMP_DEBUG_PRINT("START this[%p]", this);
 }
 
 BufferPlayer::~BufferPlayer() {
-  GMP_INFO_PRINT("START");
-
   Unload();
 
-  GMP_INFO_PRINT("loadData_ = %p", loadData_);
   if (loadData_) {
     delete loadData_;
     loadData_ = NULL;
   }
 
-  GMP_INFO_PRINT("END");
+  GMP_DEBUG_PRINT("END this[%p]", this);
 }
 
 bool BufferPlayer::Load(const std::string &uri) {
@@ -135,7 +133,7 @@ bool BufferPlayer::Load(const std::string &uri) {
 }
 
 bool BufferPlayer::Unload() {
-  GMP_INFO_PRINT("START isUnloaded_ [ %d ]", isUnloaded_);
+  GMP_INFO_PRINT(" isUnloaded_ [ %d ]", isUnloaded_);
 
   if (isUnloaded_)
     return true;
@@ -160,7 +158,7 @@ bool BufferPlayer::Unload() {
   DisconnectBusCallback();
 
   isUnloaded_ = true;
-  GMP_INFO_PRINT("END isUnloaded_ [ %d ]", isUnloaded_);
+  GMP_INFO_PRINT("isUnloaded_ [ %d ]", isUnloaded_);
   return true;
 }
 
@@ -316,8 +314,6 @@ void BufferPlayer::Initialize(gmp::service::IService *service) {
 
   gst_init(NULL, NULL);
   gst_pb_utils_init();
-
-  GMP_DEBUG_PRINT("END");
 }
 
 bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo, uint32_t display_path) {
@@ -736,7 +732,7 @@ bool BufferPlayer::CreatePipeline() {
   }
 
   currentState_ = LOADING_STATE;
-  GMP_INFO_PRINT("END currentState_ = %d", currentState_);
+  GMP_INFO_PRINT(" currentState_ = %d", currentState_);
 
   return true;
 }
@@ -800,7 +796,7 @@ bool BufferPlayer::AddSourceElements() {
 bool BufferPlayer::AddParserElements() {
   GMP_DEBUG_PRINT("Create and add audio/video parser elements");
 
-  videoPQueue_ = gst_element_factory_make("queue", "video-queue");
+  videoPQueue_ = gst_element_factory_make("queue", "video-p-queue");
   if (!videoPQueue_) {
     GMP_DEBUG_PRINT("Failed to create video queue");
     return false;
@@ -808,7 +804,7 @@ bool BufferPlayer::AddParserElements() {
 
   SetQueueBufferSize(videoPQueue_, QUEUE_MAX_SIZE, 0);
 
-  audioPQueue_ = gst_element_factory_make("queue", "audio-queue");
+  audioPQueue_ = gst_element_factory_make("queue", "audio-p-queue");
   if (!audioPQueue_) {
     GMP_DEBUG_PRINT("Failed to create audio queue");
     return false;
@@ -880,7 +876,11 @@ bool BufferPlayer::AddDecoderElements() {
   switch (loadData_->videoCodec) {
     case GMP_VIDEO_CODEC_VC1:
       GMP_DEBUG_PRINT("VC1 Decoder");
+#ifdef PLATFORM_QEMUX86
+      videoDecoder_ = gst_element_factory_make("avdec_vc1", "avdecvc1-decoder");
+#else
       videoDecoder_ = gst_element_factory_make("omxvc1dec", "omxvc1-decoder");
+#endif
       break;
     case GMP_VIDEO_CODEC_H265:
       GMP_DEBUG_PRINT("H265 Decoder");
@@ -889,8 +889,12 @@ bool BufferPlayer::AddDecoderElements() {
     case GMP_VIDEO_CODEC_H264:
     default:
       GMP_DEBUG_PRINT("H264 Decoder");
+#ifdef PLATFORM_QEMUX86
+      videoDecoder_ = gst_element_factory_make("avdec_h264", "avdec264-decoder");
+#else
       videoDecoder_ = gst_element_factory_make("omxh264dec", "omxh264-decoder");
       g_object_set(G_OBJECT(videoDecoder_), "allow-flush-in-drain", false, NULL);
+#endif
       break;
   }
 
@@ -950,7 +954,17 @@ bool BufferPlayer::AddSinkElements() {
     return false;
   }
 
+  videoConverter_ = gst_element_factory_make("videoconvert", "video-converter");
+  if (!videoConverter_ ) {
+    GMP_DEBUG_PRINT("Failed to create video converter");
+    return false;
+  }
+
+#ifdef PLATFORM_QEMUX86
+  videoSink_ = gst_element_factory_make("waylandsink", "video-sink");
+#else
   videoSink_ = gst_element_factory_make("kmssink", "video-sink");
+#endif
   if (!videoSink_) {
     GMP_DEBUG_PRINT("Failed to create video sink");
     return false;
@@ -958,7 +972,7 @@ bool BufferPlayer::AddSinkElements() {
 
   audioConverter_ = gst_element_factory_make("audioconvert", "audio-converter");
   if (!audioConverter_ ) {
-    GMP_DEBUG_PRINT("Failed to create audio converted");
+    GMP_DEBUG_PRINT("Failed to create audio converter");
     return false;
   }
 
@@ -974,14 +988,17 @@ bool BufferPlayer::AddSinkElements() {
     return false;
   }
 
-  gst_bin_add_many(GST_BIN(pipeline_), vSinkQueue_, videoSink_,
+  gst_bin_add_many(GST_BIN(pipeline_), vSinkQueue_, videoConverter_, videoSink_,
                    aSinkQueue_, audioConverter_, audioSink_, NULL);
-  if (!gst_element_link_many(videoDecoder_, vSinkQueue_, videoSink_, NULL)) {
+  if (!gst_element_link_many(videoDecoder_, vSinkQueue_, videoConverter_,
+                             videoSink_, NULL)) {
     GMP_DEBUG_PRINT("Failed to link video sink elements");
     return false;
   }
 
+#ifndef PLATFORM_QEMUX86
   g_object_set(G_OBJECT(videoSink_), "driver-name", "vc4", NULL);
+#endif
 
   if (!gst_element_link_many(audioDecoder_, aSinkQueue_, audioConverter_,
                              audioSink_, NULL)) {
@@ -994,7 +1011,7 @@ bool BufferPlayer::AddSinkElements() {
     g_object_set(G_OBJECT(videoSink_), "plane-id", planeId_, NULL);
     planeIdSet_ = true;
   }
-  
+
   GMP_DEBUG_PRINT("connId_ = %d", connId_);
   if (connId_ > 0) {
     g_object_set(G_OBJECT(videoSink_), "connector-id", connId_, NULL);
@@ -1029,8 +1046,6 @@ bool BufferPlayer::ConnectBusCallback() {
 }
 
 bool BufferPlayer::DisconnectBusCallback() {
-  GMP_INFO_PRINT("START");
-
   if (busHandler_) {
     // Drop all bus messages
     gst_bus_set_flushing(busHandler_, true);
@@ -1042,7 +1057,6 @@ bool BufferPlayer::DisconnectBusCallback() {
     busHandler_ = NULL;
   }
 
-  GMP_INFO_PRINT("END");
   return true;
 }
 

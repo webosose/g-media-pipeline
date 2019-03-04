@@ -1,4 +1,4 @@
-// Copyright (c) 2018 LG Electronics, Inc.
+// Copyright (c) 2018-2019 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -143,6 +143,7 @@ class BufferPlayer : public Player {
     GstElement* audioParser_;
 
     GstElement* videoDecoder_;
+    GstElement* videoConverter_;
     GstElement* vSinkQueue_;
     GstElement* videoSink_;
 
