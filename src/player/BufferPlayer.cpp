@@ -349,7 +349,10 @@ bool BufferPlayer::AcquireResources(gmp::base::source_info_t &sourceInfo, uint32
   if (planeId > 0)
     SetPlane(planeId);
 */
-  UpdateVideoResData(sourceInfo);
+  if (!UpdateVideoResData(sourceInfo)) {
+    GMP_DEBUG_PRINT("ERROR: UpdateVideoResData");
+    return false;
+  }
 
   if (dispRes.plane_id > 0 && dispRes.crtc_id > 0 && dispRes.conn_id > 0)
     //player_->SetPlane(dispRes.plane_id);
@@ -1303,6 +1306,10 @@ bool BufferPlayer::UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData) {
 bool BufferPlayer::UpdateVideoResData(
     const gmp::base::source_info_t &sourceInfo) {
   GMP_DEBUG_PRINT("");
+  if (sourceInfo.video_streams.empty()) {
+    GMP_DEBUG_PRINT("Invalid video stream size error");
+    return false;
+  }
 
   gmp::base::video_info_t video_stream_info = sourceInfo.video_streams.front();
 
@@ -1314,6 +1321,7 @@ bool BufferPlayer::UpdateVideoResData(
   videoInfo_.bit_rate = video_stream_info.bit_rate;
 
   NotifyVideoInfo();
+  return true;
 }
 
 void BufferPlayer::NotifyVideoInfo() {

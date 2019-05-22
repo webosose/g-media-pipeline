@@ -142,17 +142,21 @@ void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
     case NOTIFY_SOURCE_INFO: {
         gmp::parser::Composer composer;
         base::source_info_t *info  = (base::source_info_t *)payload;
-        composer.put("sourceInfo", *info);
-        umc_->sendChangeNotificationJsonString(composer.result());
+	if (!info->video_streams.empty()) {
+          composer.put("sourceInfo", *info);
+          umc_->sendChangeNotificationJsonString(composer.result());
 
-        base::video_info_t videoInfo;
-        memset(&videoInfo, 0, sizeof(base::video_info_t));
-        videoInfo.width = info->video_streams.front().width;
-        videoInfo.height = info->video_streams.front().height;
-        videoInfo.frame_rate.num = info->video_streams.front().frame_rate.num;
-        videoInfo.frame_rate.den = info->video_streams.front().frame_rate.den;
+          base::video_info_t videoInfo;
+          memset(&videoInfo, 0, sizeof(base::video_info_t));
+          videoInfo.width = info->video_streams.front().width;
+          videoInfo.height = info->video_streams.front().height;
+          videoInfo.frame_rate.num = info->video_streams.front().frame_rate.num;
+          videoInfo.frame_rate.den = info->video_streams.front().frame_rate.den;
 
-        res_requestor_->setVideoInfo(videoInfo);
+          res_requestor_->setVideoInfo(videoInfo);
+	} else {
+          GMP_DEBUG_PRINT("Invalid video stream size cannot be handled in NOTIFY_SOURCE_INFO");
+	}
 
         break;
     }

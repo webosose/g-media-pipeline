@@ -468,19 +468,27 @@ bool ResourceRequestor::setVideoInfo(const gmp::base::video_info_t &videoInfo) {
 
 bool ResourceRequestor::setSourceInfo(const gmp::base::source_info_t &sourceInfo) {
   // TODO(anonymous): Support multiple video/audio stream case
-  gmp::base::video_info_t video_stream_info = sourceInfo.video_streams.front();
-  gmp::base::audio_info_t audio_stream_info = sourceInfo.audio_streams.front();
+  if (sourceInfo.video_streams.empty() && sourceInfo.audio_streams.empty()) {
+    GMP_DEBUG_PRINT("Invalid video/audio stream size error");
+    return false;
+  }
 
-  videoResData_.width = video_stream_info.width;
-  videoResData_.height = video_stream_info.height;
-  videoResData_.vcodec = static_cast<GMP_VIDEO_CODEC>(video_stream_info.codec);
-  videoResData_.frameRate = std::round(static_cast<float>(video_stream_info.frame_rate.num) /
-                                       static_cast<float>(video_stream_info.frame_rate.den));
-  videoResData_.escanType = 0;
+  if (!sourceInfo.video_streams.empty()) {
+    gmp::base::video_info_t video_stream_info = sourceInfo.video_streams.front();
+    videoResData_.width = video_stream_info.width;
+    videoResData_.height = video_stream_info.height;
+    videoResData_.vcodec = static_cast<GMP_VIDEO_CODEC>(video_stream_info.codec);
+    videoResData_.frameRate = std::round(static_cast<float>(video_stream_info.frame_rate.num) /
+                                         static_cast<float>(video_stream_info.frame_rate.den));
+    videoResData_.escanType = 0;
+  }
 
-  audioResData_.acodec  = static_cast<GMP_AUDIO_CODEC>(audio_stream_info.codec);
-  audioResData_.channel = audio_stream_info.channels;
-  audioResData_.version = 0;
+  if (!sourceInfo.audio_streams.empty()) {
+    gmp::base::audio_info_t audio_stream_info = sourceInfo.audio_streams.front();
+    audioResData_.acodec  = static_cast<GMP_AUDIO_CODEC>(audio_stream_info.codec);
+    audioResData_.channel = audio_stream_info.channels;
+    audioResData_.version = 0;
+  }
   return true;
 }
 
