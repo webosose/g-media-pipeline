@@ -127,6 +127,49 @@ typedef struct MEDIA_LOAD_DATA {
   guint32 blockAlign;
   guint32 bitRate;
   guint32 bitsPerSample;
+  gchar* format;
+  guint32 audioObjectType;
+  guint8* codecData;
+  guint32 codecDataSize;
+
+  public:
+    MEDIA_LOAD_DATA() : maxWidth(0), maxHeight(0), maxFrameRate(0),
+                        videoCodec(GMP_VIDEO_CODEC_NONE), audioCodec(GMP_AUDIO_CODEC_NONE),
+                        ptsToDecode(0), frameRate(0), width(0), height(0), extraData(NULL),
+                        extraSize(0), displayPath(0), channels(0), sampleRate(0),
+                        blockAlign(0), bitRate(0), bitsPerSample(0), format(NULL),
+                        audioObjectType(0), codecData(NULL), codecDataSize(0) {
+    }
+    MEDIA_LOAD_DATA(guint32 maxWidth_, guint32 maxHeight_, guint32 maxFrameRate_,
+                    GMP_VIDEO_CODEC videoCodec_, GMP_AUDIO_CODEC audioCodec_,
+                    gint64 ptsToDecode_, guint32 frameRate_, guint32 width_, guint32 height_,
+                    void* extraData_, guint32 extraSize_, guint32 displayPath_,
+                    guint32 channels_, guint32 sampleRate_, guint32 blockAligh_,
+                    guint32 bitRate_, guint32 bitsPerSample_,
+                    gchar* format_, guint32 audioObjectType_,
+                    guint8* codecData_, guint32 codecdataSize_) {
+      maxWidth = maxWidth_;
+      maxHeight = maxHeight_;
+      maxFrameRate = maxFrameRate_;
+      videoCodec = videoCodec_;
+      audioCodec = audioCodec_;
+      ptsToDecode = ptsToDecode_;
+      frameRate = frameRate_;
+      width = width_;
+      height = height_;
+      extraData = extraData_;
+      extraSize = extraSize_;
+      displayPath = displayPath_;
+      channels = channels_;
+      sampleRate = sampleRate_;
+      blockAlign = blockAligh_;
+      bitRate = bitRate_;
+      bitsPerSample = bitsPerSample_;
+      format = format_;
+      audioObjectType = audioObjectType_;
+      codecData = codecData_;
+      codecDataSize = codecdataSize_;
+    }
 } MEDIA_LOAD_DATA_T;
 
 /**

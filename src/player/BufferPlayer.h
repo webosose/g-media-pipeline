@@ -134,6 +134,7 @@ class BufferPlayer : public Player {
                              gpointer userData);
 
     void SetGstreamerDebug();
+    void SetDecoderSpecificInfomation();
 
     /*Pipeline elements*/
     GstElement* videoPQueue_;

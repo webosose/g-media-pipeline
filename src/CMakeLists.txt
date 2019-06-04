@@ -35,6 +35,8 @@ include_directories(./mediaresource)
 
 include_directories(./player)
 
+include_directories(./dsi)
+
 add_subdirectory(player)
 
 add_subdirectory(mediaplayerclient)

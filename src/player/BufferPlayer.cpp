@@ -33,6 +33,7 @@
 #include <gst/base/gstbasesrc.h>
 #include <gst/pbutils/pbutils.h>
 #include <log/log.h>
+#include <memory>
 
 #include "base/types.h"
 #include "base/message.h"
@@ -40,6 +41,7 @@
 #include "parser/composer.h"
 #include "service/service.h"
 #include "util/util.h"
+#include "dsi/DSIGeneratorFactory.h"
 
 #define CURR_TIME_INTERVAL_MS    500
 #define LOAD_DONE_TIMEOUT_MS     10
@@ -400,7 +402,6 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
   currPosTimerId_ = g_timeout_add(CURR_TIME_INTERVAL_MS,
                                   (GSourceFunc)NotifyCurrentTime, this);
   feedPossible_ = true;
-
   return true;
 }
 
@@ -733,6 +734,8 @@ bool BufferPlayer::CreatePipeline() {
     GMP_INFO_PRINT("CreatePipeline -> failed to pause !!!");
     return false;
   }
+
+  SetDecoderSpecificInfomation();
 
   currentState_ = LOADING_STATE;
   GMP_INFO_PRINT(" currentState_ = %d", currentState_);
@@ -1298,6 +1301,10 @@ bool BufferPlayer::UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData) {
     loadData_->blockAlign = loadData->blockAlign;
     loadData_->bitRate = loadData->bitRate;
     loadData_->bitsPerSample = loadData->bitsPerSample;
+    loadData_->format = loadData->format;
+    loadData_->audioObjectType = loadData->audioObjectType;
+    loadData_->codecData = loadData->codecData;
+    loadData_->codecDataSize = loadData->codecDataSize;
     return true;
   }
   return false;
@@ -1401,6 +1408,27 @@ void BufferPlayer::SetGstreamerDebug() {
       setenv(kDebugFile, debug[i][kDebugFile].asString().c_str(), 1);
     if (debug[i].hasKey(kDebugDot) && !debug[i][kDebugDot].asString().empty())
       setenv(kDebugDot, debug[i][kDebugDot].asString().c_str(), 1);
+  }
+}
+void BufferPlayer::SetDecoderSpecificInfomation() {
+  GMP_DEBUG_PRINT("");
+
+  for (auto mediaSource : sourceInfo_) {
+    if (mediaSource->pSrcElement == NULL)
+      return;
+  }
+
+  if (!g_strcmp0(loadData_->format, "raw") && loadData_->audioCodec == GMP_AUDIO_CODEC_AAC) {
+    gmp::dsi::DSIGeneratorFactory factory(loadData_);
+    std::shared_ptr<gmp::dsi::DSIGenerator> sp = factory.getDSIGenerator();
+    GstCaps* caps = sp->GenerateSpecificInfo();
+    if (caps != NULL) {
+      GstPad *srcPad = gst_element_get_static_pad(sourceInfo_[IDX_AUDIO]->pSrcElement, "src");
+      gst_pad_set_caps(srcPad, caps);
+      gst_pad_use_fixed_caps(srcPad);
+      gst_object_unref(srcPad);
+      gst_caps_unref(caps);
+    }
   }
 }
 

@@ -66,6 +66,9 @@ set(G-MEDIA-PIPELINE_HEADERS
     ../log/log.h
     ../mediaresource/requestor.h
     ../service/service.h
+    ../dsi/DSIGeneratorFactory.h
+    ../dsi/DSIGenerator.h
+    ../dsi/DSIGeneratorAAC.h
     )
 
 set(G-MEDIA-PIPELINE_SRC
@@ -77,6 +80,8 @@ set(G-MEDIA-PIPELINE_SRC
     ../service/service.cpp
     ../util/util.cpp
     ../mediaresource/requestor.cpp
+    ../dsi/DSIGeneratorAAC.cpp
+    ../dsi/DSIGeneratorFactory.cpp
     )
 
 set(G-MEDIA-PIPELINE_LIB
