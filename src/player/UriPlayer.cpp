@@ -511,7 +511,7 @@ bool UriPlayer::LoadPipeline() {
   pipeline_ = gst_element_factory_make("playbin", "playbin");
 
   if (!pipeline_) {
-    GMP_DEBUG_PRINT("Cannot create pipeline!");
+    GMP_DEBUG_PRINT("ERROR : Cannot create pipeline!");
     return false;
   }
 
@@ -542,14 +542,20 @@ bool UriPlayer::LoadPipeline() {
   g_signal_connect(G_OBJECT(pipeline_), "element-setup", G_CALLBACK(elementSetupCB), this);
 
   GstElement *aSink = gst_element_factory_make("alsasink", "audio-sink");
+
+  if (!aSink ) {
+    GMP_DEBUG_PRINT("ERROR : Cannot create audio sink element!");
+    return false;
+  }
 #ifdef PLATFORM_QEMUX86
   GstElement *vSink = gst_element_factory_make("waylandsink", "video-sink");
 #else
   GstElement *vSink = gst_element_factory_make("kmssink", NULL);
 #endif
 
-  if (!aSink || !vSink) {
-    GMP_DEBUG_PRINT("Cannot create sink element!");
+  if (!vSink) {
+    GMP_DEBUG_PRINT("ERROR : Cannot create video sink element!");
+    gst_object_unref (GST_OBJECT (aSink));
     return false;
   }
 
