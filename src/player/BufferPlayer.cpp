@@ -777,26 +777,31 @@ bool BufferPlayer::AddSourceElements() {
 
     SetAppSrcBufferLevel(static_cast<MEDIA_SRC_ELEM_IDX_T>(srcIdx), pSrcInfo);
 
-    gst_util_set_object_arg(G_OBJECT(pSrcInfo->pSrcElement),
-                            "stream-type", "seekable");
+    if (pSrcInfo->pSrcElement) {
+      gst_util_set_object_arg(G_OBJECT(pSrcInfo->pSrcElement),
+                              "stream-type", "seekable");
 
-    g_signal_connect(reinterpret_cast<GstAppSrc*>(pSrcInfo->pSrcElement),
-                     "enough-data", G_CALLBACK(EnoughData), this);
-    g_signal_connect(reinterpret_cast<GstAppSrc*>(pSrcInfo->pSrcElement),
-                     "seek-data", G_CALLBACK(SeekData), this);
+      g_signal_connect(reinterpret_cast<GstAppSrc*>(pSrcInfo->pSrcElement),
+                       "enough-data", G_CALLBACK(EnoughData), this);
+      g_signal_connect(reinterpret_cast<GstAppSrc*>(pSrcInfo->pSrcElement),
+                       "seek-data", G_CALLBACK(SeekData), this);
 
-    gst_bin_add(GST_BIN(pipeline_), pSrcInfo->pSrcElement);
+      gst_bin_add(GST_BIN(pipeline_), pSrcInfo->pSrcElement);
 
-    sourceInfo_.push_back(pSrcInfo);
+      sourceInfo_.push_back(pSrcInfo);
 
-    guint64 maxBufferSize = 0;
-    g_object_get(G_OBJECT(pSrcInfo->pSrcElement),
-                 "max-bytes", &maxBufferSize, NULL);
-    GMP_DEBUG_PRINT("srcIdx[%d], maxBufferSize[%llu]", srcIdx, maxBufferSize);
+      guint64 maxBufferSize = 0;
+      g_object_get(G_OBJECT(pSrcInfo->pSrcElement),
+                   "max-bytes", &maxBufferSize, NULL);
+      GMP_DEBUG_PRINT("srcIdx[%d], maxBufferSize[%llu]", srcIdx, maxBufferSize);
+      GMP_DEBUG_PRINT("Audio/Video source elements are Added!!!");
+      return true;
+    }
+    else {
+      GMP_DEBUG_PRINT("ERROR : Audio/Video source elements Add failed!!!");
+      return false;
+    }
   }
-
-  GMP_DEBUG_PRINT("Audio/Video source elements are Added!!!");
-  return true;
 }
 
 bool BufferPlayer::AddParserElements() {
@@ -865,15 +870,21 @@ bool BufferPlayer::AddParserElements() {
     return false;
   }
 
-  gst_bin_add_many(GST_BIN(pipeline_), videoPQueue_, videoParser_,
-                                       audioPQueue_, audioParser_, NULL);
-  gst_element_link_many(sourceInfo_[IDX_VIDEO]->pSrcElement,
-                        videoPQueue_, videoParser_, NULL);
-  gst_element_link_many(sourceInfo_[IDX_AUDIO]->pSrcElement,
-                        audioPQueue_, audioParser_, NULL);
+  if ( (videoPQueue_) && (audioPQueue_) ) {
+    gst_bin_add_many(GST_BIN(pipeline_), videoPQueue_, videoParser_,
+                                         audioPQueue_, audioParser_, NULL);
+    gst_element_link_many(sourceInfo_[IDX_VIDEO]->pSrcElement,
+                          videoPQueue_, videoParser_, NULL);
+    gst_element_link_many(sourceInfo_[IDX_AUDIO]->pSrcElement,
+                          audioPQueue_, audioParser_, NULL);
 
-  GMP_DEBUG_PRINT("Audio/Video Parser elements are Added!!!");
-  return true;
+    GMP_DEBUG_PRINT("Audio/Video Parser elements are Added!!!");
+    return true;
+  }
+  else {
+    GMP_DEBUG_PRINT("ERROR : Audio/Video Parser elements failed to add!!!");
+    return false;
+  }
 }
 
 bool BufferPlayer::AddDecoderElements() {
