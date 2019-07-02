@@ -795,13 +795,12 @@ bool BufferPlayer::AddSourceElements() {
                    "max-bytes", &maxBufferSize, NULL);
       GMP_DEBUG_PRINT("srcIdx[%d], maxBufferSize[%llu]", srcIdx, maxBufferSize);
       GMP_DEBUG_PRINT("Audio/Video source elements are Added!!!");
-      return true;
     }
     else {
       GMP_DEBUG_PRINT("ERROR : Audio/Video source elements Add failed!!!");
-      return false;
     }
   }
+  return true;
 }
 
 bool BufferPlayer::AddParserElements() {
