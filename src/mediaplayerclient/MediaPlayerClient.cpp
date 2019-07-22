@@ -255,6 +255,7 @@ bool MediaPlayerClient::SetVolume(int volume) {
 bool MediaPlayerClient::SetExternalContext(GMainContext *context) {
   GMP_DEBUG_PRINT("context = %p", context);
   playerContext_ = context;
+  return true;
 }
 
 bool MediaPlayerClient::SetPlaybackRate(const double playbackRate) {

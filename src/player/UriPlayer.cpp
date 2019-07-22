@@ -763,15 +763,14 @@ void UriPlayer::SetGstreamerDebug() {
   const char *kDebugFile = "GST_DEBUG_FILE";
   const char *kDebugDot = "GST_DEBUG_DUMP_DOT_DIR";
 
-  std::string input_file("/etc/g-media-pipeline/gst_debug.conf");
-  pbnjson::JDomParser parser(NULL);
+  pbnjson::JValue parsed
+   = pbnjson::JDomParser::fromFile("/etc/g-media-pipeline/gst_debug.conf");
 
-  if (!parser.parseFile(input_file, pbnjson::JSchema::AllSchema(), NULL)) {
+  if (!parsed.isObject()) {
     GMP_DEBUG_PRINT("Debug file parsing error");
     return;
   }
 
-  pbnjson::JValue parsed = parser.getDom();
   pbnjson::JValue debug = parsed["gst_debug"];
 
   for (int i = 0; i < debug.arraySize(); i++) {

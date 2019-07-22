@@ -112,8 +112,8 @@ class Parser {
 
   gint64 get_start_time(void) {
     gint64 start_time = 0;
-    for(auto i = _dom.begin(); i != _dom.end(); ++i) {
-      _serialized = pbnjson::JGenerator::serialize((*i).second, true);
+    for(auto i : _dom.children()) {
+      _serialized = pbnjson::JGenerator::serialize(i.second, true);
 
       try {
         std::regex re("\\w+");
