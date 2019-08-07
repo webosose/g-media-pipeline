@@ -137,7 +137,7 @@ class Parser {
         break;
     }
 
-    return start_time * GST_USECOND;
+    return start_time;
   }
 
  private:

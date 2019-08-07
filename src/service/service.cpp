@@ -287,6 +287,9 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
     instance_->media_id_ = parser.get<std::string>("id");
     gint64 start_time = parser.get_start_time();
     instance_->res_requestor_ = std::make_shared<gmp::resource::ResourceRequestor>("media", instance_->media_id_);
+
+    GMP_DEBUG_PRINT("start_time: [%" G_GINT64_FORMAT " ]", start_time);
+
     // TODO(someone) : check the need
     // instance_->res_requestor_->notifyForeground();
 
@@ -308,7 +311,6 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
     GMP_DEBUG_PRINT("LoadEvent: [%s]", msg.c_str());
 
     ret = instance_->player_->Load(msg);
-
 
     if (ret && (start_time>0)) {
       GMP_DEBUG_PRINT("Reloading. Seek to [%lld]", start_time);
