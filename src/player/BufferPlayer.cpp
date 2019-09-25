@@ -248,11 +248,13 @@ bool BufferPlayer::SetPlayRate(const double rate) {
                    rate, position, duration_);
 
   if (rate > 0.0) {
-    gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
+    if (!gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
                      GstSeekFlags(GST_SEEK_FLAG_FLUSH |
                                   GST_SEEK_FLAG_KEY_UNIT |
                                   GST_SEEK_FLAG_TRICKMODE),
-                     GST_SEEK_TYPE_SET, position, GST_SEEK_TYPE_SET, duration_);
+                     GST_SEEK_TYPE_SET, position, GST_SEEK_TYPE_END,
+                     duration_))
+      GMP_INFO_PRINT("Set Playback Rate failed");
   } else {
     // reverse playback might be unsupported with some demuxer(e.g. qtdemxer)
     gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
