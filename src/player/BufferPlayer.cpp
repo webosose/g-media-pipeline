@@ -876,10 +876,16 @@ bool BufferPlayer::AddParserElements() {
   if ( (videoPQueue_) && (audioPQueue_) ) {
     gst_bin_add_many(GST_BIN(pipeline_), videoPQueue_, videoParser_,
                                          audioPQueue_, audioParser_, NULL);
-    gst_element_link_many(sourceInfo_[IDX_VIDEO]->pSrcElement,
-                          videoPQueue_, videoParser_, NULL);
-    gst_element_link_many(sourceInfo_[IDX_AUDIO]->pSrcElement,
-                          audioPQueue_, audioParser_, NULL);
+
+    if(!gst_element_link_many(sourceInfo_[IDX_VIDEO]->pSrcElement, videoPQueue_, videoParser_, NULL)) {
+      GMP_DEBUG_PRINT("Video Parser elements failed to link!!!");
+      return false;
+    }
+
+    if(!gst_element_link_many(sourceInfo_[IDX_AUDIO]->pSrcElement, audioPQueue_, audioParser_, NULL)) {
+      GMP_DEBUG_PRINT("Audio Parser elements failed to link!!!");
+      return false;
+    }
 
     GMP_DEBUG_PRINT("Audio/Video Parser elements are Added!!!");
     return true;
