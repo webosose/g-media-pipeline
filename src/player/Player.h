@@ -96,6 +96,7 @@ class UriPlayer : public Player {
   bool GetSourceInfo();
   bool LoadPipeline();
   base::error_t HandleErrorMessage(GstMessage *message);
+  void HandleStateMessage(GstMessage *message);
   int32_t ConvertErrorCode(GQuark domain, gint code);
   void SetGstreamerDebug();
   base::buffer_range_t CalculateBufferingTime();

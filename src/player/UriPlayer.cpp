@@ -415,34 +415,11 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       break;
     }
 
-    case GST_STATE_PAUSED: {
-      GMP_DEBUG_PRINT("PAUSED");
-      player->service_->Notify(NOTIFY_PAUSED);
-      break;
-    }
-
-    case GST_STATE_PLAYING: {
-      GMP_DEBUG_PRINT("PLAYING");
-      player->service_->Notify(NOTIFY_PLAYING);
-      break;
-    }
-
     case GST_MESSAGE_STATE_CHANGED: {
       GstElement *pipeline = player->pipeline_;
-      if (GST_MESSAGE_SRC(message) == GST_OBJECT_CAST(pipeline)) {
-        GstState old_state, new_state;
-        gst_message_parse_state_changed(message, &old_state, &new_state, NULL);
+      if (GST_MESSAGE_SRC(message) == GST_OBJECT_CAST(pipeline))
+        player->HandleStateMessage(message);
 
-        // generate dot graph when play start only(READY -> PAUSED)
-        if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED) {
-          GMP_DEBUG_PRINT("Generate dot graph from %s state to %s state.",
-                gst_element_state_get_name(old_state),
-                gst_element_state_get_name(new_state));
-          std::string dump_name("g-media-pipeline[" + std::to_string(getpid()) + "]");
-          GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN (pipeline),
-                GST_DEBUG_GRAPH_SHOW_ALL, dump_name.c_str());
-        }
-      }
       break;
     }
 
@@ -716,6 +693,34 @@ base::error_t UriPlayer::HandleErrorMessage(GstMessage *message) {
   g_free(debug_info);
 
   return error;
+}
+
+void UriPlayer::HandleStateMessage(GstMessage *message) {
+  GstState old_state, new_state;
+  gst_message_parse_state_changed(message, &old_state, &new_state, NULL);
+
+  switch (new_state) {
+    case GST_STATE_PAUSED: {
+      GMP_DEBUG_PRINT("PAUSED");
+      service_->Notify(NOTIFY_PAUSED);
+      break;
+    }
+
+    case GST_STATE_PLAYING: {
+      GMP_DEBUG_PRINT("PLAYING");
+      service_->Notify(NOTIFY_PLAYING);
+      break;
+    }
+  }
+  // generate dot graph when play start only(READY -> PAUSED)
+  if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED) {
+    GMP_DEBUG_PRINT("Generate dot graph from %s state to %s state.",
+          gst_element_state_get_name(old_state),
+          gst_element_state_get_name(new_state));
+    std::string dump_name("g-media-pipeline[" + std::to_string(getpid()) + "]");
+    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN (pipeline_),
+          GST_DEBUG_GRAPH_SHOW_ALL, dump_name.c_str());
+  }
 }
 
 int32_t UriPlayer::ConvertErrorCode(GQuark domain, gint code) {
