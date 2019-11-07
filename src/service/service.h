@@ -19,6 +19,7 @@
 
 #include <memory>
 #include <string>
+#include <boost/core/noncopyable.hpp>
 
 #include "PlayerTypes.h"
 #include "types.h"
@@ -34,7 +35,7 @@ namespace gmp { namespace resource { class ResourceRequestor; }}
 #define PLANE_MAP_SIZE 4
 
 namespace gmp { namespace service {
-class IService {
+class IService : private boost::noncopyable {
  public:
   virtual void Notify(const NOTIFY_TYPE_T notification) = 0;
   virtual void Notify(const NOTIFY_TYPE_T notification, const void *payload) = 0;

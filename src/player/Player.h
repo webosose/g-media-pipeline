@@ -26,6 +26,7 @@
 #include <mutex>
 #include <gst/player/player.h>
 #include <gst/pbutils/pbutils.h>
+#include <boost/core/noncopyable.hpp>
 
 #include "types.h"
 
@@ -33,7 +34,7 @@ namespace gmp { namespace service { class IService; }}
 namespace gmp { namespace resource { class ResourceRequestor; }}
 
 namespace gmp { namespace player {
-class Player {
+class Player : private boost::noncopyable {
  public:
   Player()
     : pipeline_(NULL)
