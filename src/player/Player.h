@@ -108,6 +108,7 @@ class UriPlayer : public Player {
     return true;
   }
   void ParseOptionString(const std::string &str);
+  bool Finalize();
 
   base::source_info_t source_info_;
   std::string uri_;

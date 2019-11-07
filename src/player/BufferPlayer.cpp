@@ -119,7 +119,10 @@ BufferPlayer::BufferPlayer(const std::string& appId)
 }
 
 BufferPlayer::~BufferPlayer() {
-  Unload();
+  if (!isUnloaded_) {
+    Finalize();
+    isUnloaded_ = true;
+  }
 
   if (loadData_) {
     delete loadData_;
@@ -133,23 +136,21 @@ bool BufferPlayer::Load(const std::string &uri) {
   return true;
 }
 
-bool BufferPlayer::Unload() {
-  GMP_INFO_PRINT(" isUnloaded_ [ %d ]", isUnloaded_);
-
-  if (isUnloaded_)
-    return true;
-
+bool BufferPlayer::Finalize() {
   for (auto mediaSrc : sourceInfo_) {
     if (mediaSrc)
       delete mediaSrc;
   }
   sourceInfo_.clear();
 
-  if (pipeline_) {
-    gst_element_set_state(pipeline_, GST_STATE_NULL);
-    gst_object_unref(GST_OBJECT(pipeline_));
-    pipeline_ = NULL;
+  if (!pipeline_) {
+    GMP_DEBUG_PRINT("pipeline is null");
+    return false;
   }
+
+  gst_element_set_state(pipeline_, GST_STATE_NULL);
+  gst_object_unref(GST_OBJECT(pipeline_));
+  pipeline_ = NULL;
 
   if (currPosTimerId_) {
     g_source_remove(currPosTimerId_);
@@ -158,8 +159,21 @@ bool BufferPlayer::Unload() {
 
   DisconnectBusCallback();
 
+  return true;
+}
+
+bool BufferPlayer::Unload() {
+  GMP_INFO_PRINT(" isUnloaded_ [ %d ]", isUnloaded_);
+
+  if (isUnloaded_)
+    return true;
+
+  if (!Finalize()) {
+    return false;
+  }
   isUnloaded_ = true;
   GMP_INFO_PRINT("isUnloaded_ [ %d ]", isUnloaded_);
+
   return true;
 }
 

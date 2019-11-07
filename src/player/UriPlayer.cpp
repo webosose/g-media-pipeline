@@ -46,9 +46,39 @@ UriPlayer::UriPlayer()
 }
 
 UriPlayer::~UriPlayer() {
-  Unload();
+  Finalize();
+
   gst_deinit();
   GMP_DEBUG_PRINT("END this[%p]", this);
+}
+
+bool UriPlayer::Finalize() {
+  if (!pipeline_) {
+    GMP_DEBUG_PRINT("pipeline is null");
+    return false;
+  }
+
+  if (queue2_)
+    g_object_unref(queue2_);
+
+  gst_element_set_state(pipeline_, GST_STATE_NULL);
+  gst_object_unref(GST_OBJECT(pipeline_));
+  pipeline_ = NULL;
+
+  if (positionTimer_id_) {
+    g_source_remove(positionTimer_id_);
+    positionTimer_id_ = 0;
+  }
+
+  if (bufferingTimer_id_) {
+    g_source_remove(bufferingTimer_id_);
+    bufferingTimer_id_ = 0;
+  }
+
+  current_position_ = 0;
+  SetPlayerState(base::playback_state_t::STOPPED);
+
+  return true;
 }
 
 bool UriPlayer::Load(const std::string &str) {
@@ -95,31 +125,9 @@ bool UriPlayer::Load(const std::string &str) {
 
 bool UriPlayer::Unload() {
   GMP_DEBUG_PRINT("unload");
-  if (!pipeline_) {
-    GMP_DEBUG_PRINT("pipeline is null");
+
+  if (!Finalize())
     return false;
-  }
-
-  if (queue2_)
-    g_object_unref(queue2_);
-
-  gst_element_set_state(pipeline_, GST_STATE_NULL);
-  gst_object_unref(GST_OBJECT(pipeline_));
-  pipeline_ = NULL;
-
-  if (positionTimer_id_) {
-    g_source_remove(positionTimer_id_);
-    positionTimer_id_ = 0;
-  }
-
-  if (bufferingTimer_id_) {
-    g_source_remove(bufferingTimer_id_);
-    bufferingTimer_id_ = 0;
-  }
-
-  current_position_ = 0;
-
-  SetPlayerState(base::playback_state_t::STOPPED);
 
   service_->Notify(NOTIFY_UNLOAD_COMPLETED);
   return service_->Stop();
