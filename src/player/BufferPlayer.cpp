@@ -35,7 +35,6 @@
 #include <log/log.h>
 #include <memory>
 
-#include "base/types.h"
 #include "base/message.h"
 #include "mediaresource/requestor.h"
 #include "parser/composer.h"
