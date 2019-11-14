@@ -17,7 +17,6 @@
 #include "Player.h"
 #include <log/log.h>
 #include <util/util.h>
-#include <base/types.h>
 #include <base/message.h>
 #include <service/service.h>
 #include <gst/pbutils/pbutils.h>
@@ -298,7 +297,7 @@ bool UriPlayer::GetSourceInfo() {
 
     video_stream_info.width = gst_discoverer_video_info_get_width(video);
     video_stream_info.height = gst_discoverer_video_info_get_height(video);
-    video_stream_info.codec = 0;
+    video_stream_info.codec = GMP_VIDEO_CODEC_NONE;
     video_stream_info.bit_rate = gst_discoverer_video_info_get_bitrate(video);
     video_stream_info.frame_rate.num = gst_discoverer_video_info_get_framerate_num(video);
     video_stream_info.frame_rate.den = gst_discoverer_video_info_get_framerate_denom(video);
@@ -317,7 +316,7 @@ bool UriPlayer::GetSourceInfo() {
     GList *first = g_list_first(audio_info);
     GstDiscovererAudioInfo *audio
       = reinterpret_cast<GstDiscovererAudioInfo *>(first->data);
-    audio_stream_info.codec = 0;
+    audio_stream_info.codec = GMP_AUDIO_CODEC_NONE;
     audio_stream_info.bit_rate = gst_discoverer_audio_info_get_bitrate(audio);
     audio_stream_info.sample_rate
       = gst_discoverer_audio_info_get_sample_rate(audio);
@@ -463,7 +462,7 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
         video_info.frame_rate.den = fps_d;
         // TODO: we already know this info. but it's not used now.
         video_info.bit_rate = 0;
-        video_info.codec = 0;
+        video_info.codec = GMP_VIDEO_CODEC_NONE;
 
         player->service_->Notify(NOTIFY_VIDEO_INFO, &video_info);
       }
