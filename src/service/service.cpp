@@ -16,199 +16,24 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-#include <UMSConnector.h>
 #include <string>
+#include <UMSConnector.h>
 #include "log/log.h"
 #include "base/types.h"
+#include "base/message.h"
 #include "parser/parser.h"
 #include "parser/composer.h"
 #include "player/Player.h"
 #include "mediaresource/requestor.h"
 #include "service/service.h"
+#include "playerfactory/PlayerFactory.h"
+#include <memory>
 
 namespace gmp { namespace service {
-Service *Service::instance_ = NULL;
+Service *Service::instance_ = nullptr;
 
-Service::Service(const char *service_name)
-  : umc_(NULL)
-  , media_id_("")
-  , player_(NULL) {
-  umc_ = new UMSConnector(service_name, NULL, NULL, UMS_CONNECTOR_PRIVATE_BUS);
-}
-
-Service *Service::GetInstance(const char *service_name) {
-  if (!instance_)
-    instance_ = new Service(service_name);
-  return instance_;
-}
-
-Service::~Service() {
-  if (umc_)
-    delete umc_;
-
-  if (res_requestor_) {
-    res_requestor_->releaseResource();
-  }
-}
-
-void Service::Notify(const NOTIFY_TYPE_T notification) {
-  switch (notification) {
-    case NOTIFY_LOAD_COMPLETED: {
-        gchar *message = g_strdup_printf("{\"loadCompleted\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-        umc_->sendChangeNotificationJsonString(message);
-        g_free(message);
-        // TODO(someone) : check the need
-        // res_requestor_->mediaContentReady(true);
-
-        if (instance_->player_->reloading_) {
-          gint64 start_time = instance_->player_->reload_seek_position_;
-          instance_->player_->reloading_ = false;
-          instance_->player_->reload_seek_position_ = 0;
-          instance_->player_->Seek(start_time);
-        }
-
-        break;
-    }
-
-    case NOTIFY_UNLOAD_COMPLETED: {
-        gchar *message = g_strdup_printf("{\"unloadCompleted\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-        umc_->sendChangeNotificationJsonString(message);
-        g_free(message);
-        break;
-    }
-
-    case NOTIFY_END_OF_STREAM: {
-        gchar *message = g_strdup_printf("{\"endOfStream\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-        umc_->sendChangeNotificationJsonString(message);
-        g_free(message);
-        break;
-    }
-
-    case NOTIFY_SEEK_DONE: {
-      gchar *message = g_strdup_printf("{\"seekDone\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-      umc_->sendChangeNotificationJsonString(message);
-      g_free(message);
-      break;
-    }
-
-    case NOTIFY_PLAYING: {
-      gchar *message = g_strdup_printf("{\"playing\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-      umc_->sendChangeNotificationJsonString(message);
-      g_free(message);
-      break;
-    }
-
-    case NOTIFY_PAUSED: {
-      gchar *message = g_strdup_printf("{\"paused\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-      umc_->sendChangeNotificationJsonString(message);
-      g_free(message);
-      break;
-    }
-
-    case NOTIFY_BUFFERING_START: {
-      gchar *message = g_strdup_printf("{\"bufferingStart\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-      umc_->sendChangeNotificationJsonString(message);
-      g_free(message);
-      break;
-    }
-
-    case NOTIFY_BUFFERING_END: {
-      gchar *message = g_strdup_printf("{\"bufferingEnd\":{\"mediaId\":\"%s\"}}", media_id_.c_str());
-      umc_->sendChangeNotificationJsonString(message);
-      g_free(message);
-      break;
-    }
-
-    default: {
-      GMP_DEBUG_PRINT("This notification can't be handled here!");
-      break;
-    }
-  }
-}
-
-void Service::Notify(const NOTIFY_TYPE_T notification, const void *payload) {
-  if (!payload)
-    return;
-
-  switch (notification) {
-    case NOTIFY_CURRENT_TIME: {
-        gmp::parser::Composer composer;
-        gmp::base::time_t *current_position  = (gmp::base::time_t *)payload;
-        composer.put("currentTime", *current_position);
-        umc_->sendChangeNotificationJsonString(composer.result());
-        break;
-    }
-
-    case NOTIFY_SOURCE_INFO: {
-        gmp::parser::Composer composer;
-        base::source_info_t *info  = (base::source_info_t *)payload;
-	if (!info->video_streams.empty()) {
-          composer.put("sourceInfo", *info);
-          umc_->sendChangeNotificationJsonString(composer.result());
-
-          base::video_info_t videoInfo;
-          memset(&videoInfo, 0, sizeof(base::video_info_t));
-          videoInfo.width = info->video_streams.front().width;
-          videoInfo.height = info->video_streams.front().height;
-          videoInfo.frame_rate.num = info->video_streams.front().frame_rate.num;
-          videoInfo.frame_rate.den = info->video_streams.front().frame_rate.den;
-
-          res_requestor_->setVideoInfo(videoInfo);
-	} else {
-          GMP_DEBUG_PRINT("Invalid video stream size cannot be handled in NOTIFY_SOURCE_INFO");
-	}
-
-        break;
-    }
-
-    case NOTIFY_VIDEO_INFO: {
-        gmp::parser::Composer composer;
-        base::video_info_t *info = (base::video_info_t*)payload;
-        composer.put("videoInfo", *info);
-        GMP_INFO_PRINT("%s : info->width[%d], info->height[%d]", __func__, info->width, info->height);
-        umc_->sendChangeNotificationJsonString(composer.result());
-        res_requestor_->setVideoInfo(*info);
-        break;
-    }
-
-    case NOTIFY_AUDIO_INFO: {
-        gmp::parser::Composer composer;
-        base::audio_info_t *info = (base::audio_info_t*)payload;
-        composer.put("audioInfo", *info);
-        umc_->sendChangeNotificationJsonString(composer.result());
-        break;
-    }
-
-    case NOTIFY_ERROR: {
-        gmp::parser::Composer composer;
-        base::error_t *error = (base::error_t *)payload;
-        error->mediaId = media_id_;
-        composer.put("error", *error);
-        umc_->sendChangeNotificationJsonString(composer.result());
-        break;
-    }
-
-    case NOTIFY_BUFFER_RANGE: {
-        gmp::parser::Composer composer;
-        base::buffer_range_t *range = (base::buffer_range_t *)payload;
-        composer.put("bufferRange", *range);
-        umc_->sendChangeNotificationJsonString(composer.result());
-        break;
-    }
-
-    default: {
-        GMP_DEBUG_PRINT("This notification can't be handled here!");
-        break;
-    }
-  }
-}
-
-void Service::Initialize(gmp::player::Player *player) {
-  if (!player || !umc_)
-    return;
-
-  player_ = player;
-  player_->Initialize(this);
+Service::Service(const std::string& service_name) {
+  umc_ = std::make_unique<UMSConnector>(service_name, nullptr, nullptr, UMS_CONNECTOR_PRIVATE_BUS);
 
   static UMSConnectorEventHandler event_handlers[] = {
     // uMediaserver public API
@@ -222,24 +47,119 @@ void Service::Initialize(gmp::player::Player *player) {
     {"seek", Service::SeekEvent},
     {"stateChange", Service::StateChangeEvent},
     {"unsubscribe", Service::UnsubscribeEvent},
+    {"setUri", Service::SetUriEvent},
     {"setPlayRate", Service::SetPlayRateEvent},
+    {"selectTrack", Service::SelectTrackEvent},
+    {"setUpdateInterval", Service::SetUpdateIntervalEvent},
+    {"setUpdateIntervalKV", Service::SetUpdateIntervalKVEvent},
+    {"changeResolution", Service::ChangeResolutionEvent},
+    {"setStreamQuality", Service::SetStreamQualityEvent},
+    {"setProperty", Service::SetPropertyEvent},
     {"setVolume", Service::SetVolumeEvent},
     {"setPlane", Service::SetPlaneEvent},
 
-    // Resource Manager API
-    {"registerPipeline", Service::RegisterPipelineEvent},
-    {"unregisterPipeline", Service::UnregisterPipelineEvent},
-    {"acquire", Service::AcquireEvent},
-    {"tryAcquire", Service::TryAcquireEvent},
-    {"release", Service::ReleaseEvent},
-    {"notifyForeground", Service::NotifyForegroundEvent},
-    {"notifyBackground", Service::NotifyBackgroundEvent},
-    {"notifyActivity", Service::NotifyActivityEvent},
-    {"trackAppProcesses", Service::TrackAppProcessesEvent},
+    // pipeline state query API
+    {"getPipelineState", Service::GetPipelineStateEvent},
+    {"logPipelineState", Service::LogPipelineStateEvent},
+    {"getActivePipelines", Service::GetActivePipelinesEvent},
+    {"setPipelineDebugState", Service::SetPipelineDebugStateEvent},
 
-    {NULL, NULL}};
+    // exit
+    {"exit", Service::ExitEvent},
+    {nullptr, nullptr}
+  };
 
   umc_->addEventHandlers(reinterpret_cast<UMSConnectorEventHandler *>(event_handlers));
+}
+
+Service* Service::GetInstance(const std::string& service_name) {
+  if (!instance_)
+    instance_ = new Service(service_name);
+  return instance_;
+}
+
+Service::~Service() {}
+
+void Service::Notify(const gint notification, const gint64 numValue, const gchar *strValue, void *payload) {
+  gmp::parser::Composer composer;
+  gmp::base::media_info_t mediaInfo = { media_id_ };
+  switch (notification) {
+    case NOTIFY_CURRENT_TIME: {
+      gmp::base::time_t current_position  = *static_cast<gmp::base::time_t *>(payload);
+      composer.put("currentTime", current_position);
+      break;
+    }
+    case NOTIFY_SOURCE_INFO: {
+      base::source_info_t info  = *static_cast<base::source_info_t *>(payload);
+      composer.put("sourceInfo", info);
+      break;
+    }
+    case NOTIFY_VIDEO_INFO: {
+      base::video_info_t info = *static_cast<base::video_info_t*>(payload);
+      composer.put("videoInfo", info);
+      GMP_INFO_PRINT("videoInfo: width %d, height %d", info.width, info.height);
+      break;
+    }
+    case NOTIFY_AUDIO_INFO: {
+      base::audio_info_t info = *static_cast<base::audio_info_t*>(payload);
+      composer.put("audioInfo", info);
+      break;
+    }
+    case NOTIFY_ERROR: {
+      base::error_t error = *static_cast<base::error_t *>(payload);
+      error.mediaId = media_id_;
+      composer.put("error", error);
+
+      if (numValue == GMP_ERROR_RES_ALLOC) {
+        GMP_DEBUG_PRINT("policy action occured!");
+        // TODO(nakyeon) : Check unload event from ums is coming after this notification
+        this->media_player_client_.reset();
+      }
+      break;
+    }
+    case NOTIFY_BUFFER_RANGE: {
+      base::buffer_range_t range = *static_cast<base::buffer_range_t *>(payload);
+      composer.put("bufferRange", range);
+      break;
+    }
+    case NOTIFY_LOAD_COMPLETED: {
+      composer.put("loadCompleted", mediaInfo);
+      break;
+    }
+    case NOTIFY_UNLOAD_COMPLETED: {
+      composer.put("unloadCompleted", mediaInfo);
+      break;
+    }
+    case NOTIFY_END_OF_STREAM: {
+      composer.put("endOfStream", mediaInfo);
+      break;
+    }
+    case NOTIFY_SEEK_DONE: {
+      composer.put("seekDone", mediaInfo);
+      break;
+    }
+    case NOTIFY_PLAYING: {
+      composer.put("playing", mediaInfo);
+      break;
+    }
+    case NOTIFY_PAUSED: {
+      composer.put("paused", mediaInfo);
+      break;
+    }
+    case NOTIFY_BUFFERING_START: {
+      composer.put("bufferingStart", mediaInfo);
+      break;
+    }
+    case NOTIFY_BUFFERING_END: {
+      composer.put("bufferingEnd", mediaInfo);
+      break;
+    }
+    default: {
+      GMP_DEBUG_PRINT("This notification(%d) can't be handled here!", notification);
+      break;
+    }
+  }
+  umc_->sendChangeNotificationJsonString(composer.result());
 }
 
 bool Service::Wait() {
@@ -250,75 +170,41 @@ bool Service::Stop() {
   return umc_->stop();
 }
 
-bool Service::acquire(gmp::base::source_info_t &source_info, const int32_t display_path) {
-  gmp::resource::PortResource_t resourceMMap;
-  gmp::base::disp_res_t dispRes = {-1,-1,-1};
-
-  res_requestor_->setSourceInfo(source_info);
-
-  if (!res_requestor_->acquireResources(NULL, resourceMMap, dispRes, display_path)) {
-    GMP_DEBUG_PRINT("resource acquisition failed");
-    return false;
-  }
-
-  for (auto it : resourceMMap) {
-    GMP_DEBUG_PRINT("Got Resource - name:%s, index:%d", it.first.c_str(), it.second);
-  }
-
-  if (dispRes.plane_id > 0 && dispRes.crtc_id > 0 && dispRes.conn_id > 0)
-    //player_->SetPlane(dispRes.plane_id);
-    player_->SetDisplayResource(dispRes);
-  else {
-    GMP_DEBUG_PRINT("ERROR : Failed to get displayResource(%d,%d,%d)", dispRes.plane_id, dispRes.crtc_id, dispRes.conn_id);
-    return false;
-  }
-/*
-  if (plane_id > 0)
-    player_->SetPlane(plane_id);
-*/
-  GMP_DEBUG_PRINT("resource acquired!!!, plane_id: %d, crtc_id: %d, conn_id: %d", dispRes.plane_id, dispRes.crtc_id, dispRes.conn_id);
-  return true;
-}
-
 // uMediaserver public API
 bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-    bool ret = false;
-    gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
-    instance_->media_id_ = parser.get<std::string>("id");
-    gint64 start_time = parser.get_start_time();
-    instance_->res_requestor_ = std::make_shared<gmp::resource::ResourceRequestor>("media", instance_->media_id_);
+  std::string msg = instance_->umc_->getMessageText(message);
+  GMP_DEBUG_PRINT("%s", msg.c_str());
 
-    GMP_DEBUG_PRINT("start_time: [%" G_GINT64_FORMAT " ]", start_time);
+  pbnjson::JDomParser parser;
+  if (!parser.parse(msg, pbnjson::JSchema::AllSchema())) {
+      GMP_DEBUG_PRINT("ERROR JDomParser.parse. msg=%s", msg.c_str());
+      return false;
+  }
+  pbnjson::JValue parsed = parser.getDom();
+  if (!parsed.hasKey("id") && parsed["id"].isString()) {
+    GMP_DEBUG_PRINT("id is invalid");
+    return false;
+  }
+  instance_->media_id_ = parsed["id"].asString();
+  instance_->app_id_ = parsed["options"]["option"]["appId"].asString();
 
-    // TODO(someone) : check the need
-    // instance_->res_requestor_->notifyForeground();
+  instance_->media_player_client_ =
+    std::make_unique<gmp::player::MediaPlayerClient>(instance_->app_id_, instance_->media_id_);
 
-    // TODO(jaehoon) : need to implement
-    instance_->res_requestor_->registerUMSPolicyActionCallback([=] () {
-            GMP_DEBUG_PRINT("registerUMSPolicyActionCallback");
-            instance_->res_requestor_->notifyBackground();
-            instance_->player_->Unload();
-            });
+  instance_->media_player_client_->RegisterCallback(
+    std::bind(&Service::Notify, instance_,
+      std::placeholders::_1, std::placeholders::_2,
+      std::placeholders::_3, std::placeholders::_4));
 
-/*
-    instance_->res_requestor_->registerPlaneIdCallback([=] (int32_t planeId) -> bool {
-            GMP_DEBUG_PRINT("registerPlaneIdCallback planeId:%d", planeId);
-            instance_->player_->SetPlane(planeId);
-            return true;
-            });
-*/
-    std::string msg = instance_->umc_->getMessageText(message);
-    GMP_DEBUG_PRINT("LoadEvent: [%s]", msg.c_str());
-
-    ret = instance_->player_->Load(msg);
-
-    if (ret && (start_time>0)) {
-      GMP_DEBUG_PRINT("Reloading. Seek to [%lld]", start_time);
-      instance_->player_->reloading_ = true;
-      instance_->player_->reload_seek_position_ = start_time;
-    }
-
-    return ret;
+  bool ret;
+  ret = instance_->media_player_client_->Load(msg);
+  if (!ret) {
+    base::error_t error;
+    error.errorCode = MEDIA_MSG_ERR_LOAD;
+    error.errorText = "Load Failed";
+    instance_->Notify(NOTIFY_ERROR, 0, nullptr, static_cast<void*>(&error));
+  }
+  return ret;
 }
 
 bool Service::AttachEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
@@ -326,26 +212,32 @@ bool Service::AttachEvent(UMSConnectorHandle *handle, UMSConnectorMessage *messa
 }
 
 bool Service::UnloadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-    instance_->res_requestor_->notifyBackground();
-    instance_->res_requestor_->releaseResource();
-    return instance_->player_->Unload();
+  bool ret;
+  ret = instance_->media_player_client_->Unload();
+  if (!ret) {
+    base::error_t error;
+    error.errorCode = MEDIA_MSG_ERR_LOAD;
+    error.errorText = "Unload Failed";
+    instance_->Notify(NOTIFY_ERROR, 0, nullptr, static_cast<void*>(&error));
+  }
+  return ret;
 }
 
 // media operations
 bool Service::PlayEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   GMP_DEBUG_PRINT("PlayEvent");
-  return instance_->player_->Play();
+  return instance_->media_player_client_->Play();
 }
 
 bool Service::PauseEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   GMP_DEBUG_PRINT("PauseEvent");
-  return instance_->player_->Pause();
+  return instance_->media_player_client_->Pause();
 }
 
 bool Service::SeekEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   GMP_DEBUG_PRINT("SeekEvent");
   int64_t position = std::stoll(instance_->umc_->getMessageText(message));
-  return instance_->player_->Seek(position);
+  return instance_->media_player_client_->Seek(position);
 }
 
 bool Service::StateChangeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
@@ -356,66 +248,70 @@ bool Service::UnsubscribeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *
   return true;
 }
 
+bool Service::SetUriEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
+}
+
 bool Service::SetPlayRateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   GMP_DEBUG_PRINT("SetPlayRateEvent");
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
-  return instance_->player_->SetPlayRate(parser.get<double>("playRate"));
+  return instance_->media_player_client_->SetPlaybackRate(parser.get<double>("playRate"));
+}
+
+bool Service::SelectTrackEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
+}
+
+bool Service::SetUpdateIntervalEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
+}
+
+bool Service::SetUpdateIntervalKVEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
+}
+
+bool Service::ChangeResolutionEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
+}
+
+bool Service::SetStreamQualityEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
+}
+
+bool Service::SetPropertyEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return true;
 }
 
 bool Service::SetVolumeEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   GMP_DEBUG_PRINT("SetVolumeEvent");
   gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
-  return instance_->player_->SetVolume(parser.get<int>("volume"));
+  return instance_->media_player_client_->SetVolume(parser.get<int>("volume"));
 }
 
 bool Service::SetPlaneEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-/*
-  GMP_DEBUG_PRINT("SetPlaneEvent");
-  int planeID = -1;
-  gmp::parser::Parser parser(instance_->umc_->getMessageText(message));
-  planeID = parser.get<int>("planeID");
-  GMP_DEBUG_PRINT("setPlaneEvent player:%p, planeId:%d", instance_->player_, planeID);
-  return instance_->player_->SetPlane(planeID);
-*/
   return true;
 }
 
-// Resource Manager API
-bool Service::RegisterPipelineEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+// pipeline state query API
+bool Service::GetPipelineStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   return true;
 }
 
-bool Service::UnregisterPipelineEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+bool Service::LogPipelineStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   return true;
 }
 
-bool Service::AcquireEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+bool Service::GetActivePipelinesEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   return true;
 }
 
-bool Service::TryAcquireEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+bool Service::SetPipelineDebugStateEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
   return true;
 }
 
-bool Service::ReleaseEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
+// exit
+bool Service::ExitEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
+  return instance_->umc_->stop();
 }
-
-bool Service::NotifyForegroundEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::NotifyBackgroundEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::NotifyActivityEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
-bool Service::TrackAppProcessesEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message, void *ctxt) {
-  return true;
-}
-
 }  // namespace service
 }  // namespace gmp

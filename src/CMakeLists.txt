@@ -35,11 +35,17 @@ include_directories(./mediaresource)
 
 include_directories(./player)
 
+include_directories(./playerfactory)
+
 include_directories(./dsi)
+
+include_directories(./lsm-connector/include)
 
 add_subdirectory(player)
 
 add_subdirectory(mediaplayerclient)
+
+add_subdirectory(lsm-connector)
 
 find_package(Threads REQUIRED)
 

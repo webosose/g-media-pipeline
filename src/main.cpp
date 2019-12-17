@@ -15,7 +15,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <log/log.h>
-#include <player/Player.h>
 #include <service/service.h>
 #include <unistd.h>
 #include <string.h>
@@ -24,7 +23,7 @@
 
 int main(int argc, char * argv[]) {
   int c;
-  char service_name[MAX_SERVICE_STRING+1];
+  char service_name[MAX_SERVICE_STRING+1] = {'\0',};
   bool service_name_specified = false;
 
   while ((c = getopt(argc, argv, "s:")) != -1) {
@@ -38,21 +37,19 @@ int main(int argc, char * argv[]) {
         GMP_DEBUG_PRINT("unknown service name");
         break;
 
-      default:  break;
+      default:
+        break;
     }
   }
 
   if (!service_name_specified)
     return 1;
 
-  gmp::player::UriPlayer *player = new gmp::player::UriPlayer();
-  gmp::service::Service *service
-                         = gmp::service::Service::GetInstance(service_name);
+  gmp::service::Service* service
+    = gmp::service::Service::GetInstance(service_name);
 
-  service->Initialize(player);
   service->Wait();
 
-  delete player;
   delete service;
 
   return 0;

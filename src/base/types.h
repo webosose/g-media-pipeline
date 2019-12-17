@@ -20,49 +20,6 @@
 #include <string>
 #include <vector>
 
-/**
- * video codec
- */
-typedef enum {
-  GMP_VIDEO_CODEC_NONE,
-  GMP_VIDEO_CODEC_H264,
-  GMP_VIDEO_CODEC_VC1,
-  GMP_VIDEO_CODEC_MPEG2,
-  GMP_VIDEO_CODEC_MPEG4,
-  GMP_VIDEO_CODEC_THEORA,
-  GMP_VIDEO_CODEC_VP8,
-  GMP_VIDEO_CODEC_VP9,
-  GMP_VIDEO_CODEC_H265,
-  GMP_VIDEO_CODEC_MJPEG,
-  GMP_VIDEO_CODEC_MAX = GMP_VIDEO_CODEC_MJPEG,
-} GMP_VIDEO_CODEC;
-
-/**
- * audio codec
- */
-typedef enum {
-  GMP_AUDIO_CODEC_NONE,
-  GMP_AUDIO_CODEC_AAC,
-  GMP_AUDIO_CODEC_MP3,
-  GMP_AUDIO_CODEC_PCM,
-  GMP_AUDIO_CODEC_VORBIS,
-  GMP_AUDIO_CODEC_FLAC,
-  GMP_AUDIO_CODEC_AMR_NB,
-  GMP_AUDIO_CODEC_AMR_WB,
-  GMP_AUDIO_CODEC_PCM_MULAW,
-  GMP_AUDIO_CODEC_GSM_MS,
-  GMP_AUDIO_CODEC_PCM_S16BE,
-  GMP_AUDIO_CODEC_PCM_S24BE,
-  GMP_AUDIO_CODEC_OPUS,
-  GMP_AUDIO_CODEC_EAC3,
-  GMP_AUDIO_CODEC_PCM_ALAW,
-  GMP_AUDIO_CODEC_ALAC,
-  GMP_AUDIO_CODEC_AC3,
-  GMP_AUDIO_CODEC_DTS,
-  GMP_AUDIO_CODEC_MAX = GMP_AUDIO_CODEC_DTS,
-} GMP_AUDIO_CODEC;
-
-
 // TODO(anonymous): split this on domains,
 // e.g. media_types.h, ipc_types.h, error.h, etc.
 
@@ -83,6 +40,7 @@ struct rational_t {
 };
 
 struct stream_info_t {
+  int32_t codec;
   uint64_t bit_rate;
 };
 
@@ -90,13 +48,11 @@ struct video_info_t : stream_info_t {
   uint32_t width;
   uint32_t height;
   rational_t frame_rate;
-  GMP_VIDEO_CODEC codec;
 };
 
 struct audio_info_t : stream_info_t {
   int32_t channels;
   uint32_t sample_rate;
-  GMP_AUDIO_CODEC codec;
 };
 
 struct program_info_t {
@@ -135,6 +91,17 @@ struct disp_res_t {
   int32_t plane_id;
   int32_t crtc_id;
   int32_t conn_id;
+};
+
+struct media_info_t {
+  std::string mediaId;
+};
+
+struct load_param_t {
+  std::string videoDisplayMode;
+  int32_t displayPath;
+  std::string windowId;
+  std::string uri;
 };
 
 }  // namespace base

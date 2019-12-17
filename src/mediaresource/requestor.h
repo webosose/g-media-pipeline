@@ -27,15 +27,12 @@
 #include <map>
 #include <dto_types.h>
 
-#include "PlayerTypes.h"
+#include "../player/PlayerTypes.h"
 
 namespace mrc { class ResourceCalculator; }
 namespace gmp { namespace base { struct source_info_t; }}
 
-namespace uMediaServer {   class ResourceManagerClient; }
-
-class MDCClient;
-class MDCContentProvider;
+namespace uMediaServer { class ResourceManagerClient; }
 
 namespace gmp { namespace resource {
 
@@ -69,48 +66,32 @@ typedef std::multimap<std::string, int> PortResource_t;
 
 class ResourceRequestor {
  public:
-  ResourceRequestor(const std::string& appId);
-  explicit ResourceRequestor(const std::string& appId, const std::string& connectionId);
+  explicit ResourceRequestor(const std::string& appId, const std::string& connectionId = "");
   virtual ~ResourceRequestor();
 
   const std::string getConnectionId() const { return connectionId_; }
   void registerUMSPolicyActionCallback(Functor callback) { cb_ = callback; }
   void registerPlaneIdCallback(PlaneIDFunctor callback) { planeIdCb_ = callback; }
 
-  void unregisterWithMDC();
-
-  bool acquireResources(void* meta, PortResource_t& resourceMMap, gmp::base::disp_res_t & res, const int32_t display_path = 0);
+  bool acquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);
 
   bool releaseResource();
 
   bool notifyForeground() const;
   bool notifyBackground() const;
   bool notifyActivity() const;
+  bool notifyPipelineStatus(const std::string& status) const;
 
   void allowPolicyAction(const bool allow);
-
-  bool setVideoDisplayWindow(const long left, const long top,
-      const long width, const long height,
-      const bool isFullScreen) const;
-
-  bool setVideoCustomDisplayWindow(const long src_left, const long src_top,
-      const long src_width, const long src_height,
-      const long dst_left, const long dst_top,
-      const long dst_width, const long dst_height,
-      const bool isFullScreen) const;
 
   bool muteAudio(bool mute) { return false; }
   bool muteVideo(bool mute) { return false; }
 
-  bool mediaContentReady(bool state);
-
-  bool setVideoInfo(const gmp::base::video_info_t &videoInfo);
   bool setSourceInfo(const gmp::base::source_info_t &sourceInfo);
   void setAppId(std::string id);
+  int32_t getDisplayPath();
 
  private:
-  void ResourceRequestorInit(const std::string& connectionId);
-  void ResourceRequestorInit();
   bool policyActionHandler(const char *action,
       const char *resources,
       const char *requestorType,
@@ -129,8 +110,6 @@ class ResourceRequestor {
 
   std::shared_ptr<MRC> rc_;
   std::shared_ptr<uMediaServer::ResourceManagerClient> umsRMC_;
-  std::shared_ptr<MDCClient> umsMDC_;
-  std::shared_ptr<MDCContentProvider> umsMDCCR_;
   std::string appId_;
   std::string connectionId_;
   Functor cb_;

@@ -8,108 +8,76 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
+
 // SPDX-License-Identifier: Apache-2.0
 
-#include "Player.h"
+#include "UriPlayer.h"
 #include <log/log.h>
 #include <util/util.h>
+#include <base/types.h>
 #include <base/message.h>
-#include <service/service.h>
 #include <gst/pbutils/pbutils.h>
 #include <pbnjson.hpp>
 #include <sys/types.h>
 #include <unistd.h>
+#include <gst/video/videooverlay.h>
+#include "ElementFactory.h"
+
+#include "parser/parser.h"
 
 #define DISCOVER_EXPIRE_TIME (10 * GST_SECOND)
 #define UPDATE_INTERVAL_MS 200
 
 namespace gmp { namespace player {
-UriPlayer::UriPlayer()
-    : uri_(""),
-    positionTimer_id_(0),
-    bufferingTimer_id_(0),
-    planeId_(-1),
-    crtcId_(-1),
-    connId_(-1),
-    display_path_(0),
-    queue2_(NULL),
-    buffering_(false),
-    buffering_time_updated_(false),
-    buffered_time_(-1),
-    httpSource_(false),
-    current_state_(base::playback_state_t::STOPPED) {
-  GMP_DEBUG_PRINT("START this[%p]", this);
+
+UriPlayer::UriPlayer() {
 }
 
 UriPlayer::~UriPlayer() {
-  Finalize();
-
-  gst_deinit();
-  GMP_DEBUG_PRINT("END this[%p]", this);
-}
-
-bool UriPlayer::Finalize() {
-  if (!pipeline_) {
-    GMP_DEBUG_PRINT("pipeline is null");
-    return false;
-  }
-
-  if (queue2_)
-    g_object_unref(queue2_);
-
-  gst_element_set_state(pipeline_, GST_STATE_NULL);
-  gst_object_unref(GST_OBJECT(pipeline_));
-  pipeline_ = NULL;
-
-  if (positionTimer_id_) {
-    g_source_remove(positionTimer_id_);
-    positionTimer_id_ = 0;
-  }
-
-  if (bufferingTimer_id_) {
-    g_source_remove(bufferingTimer_id_);
-    bufferingTimer_id_ = 0;
-  }
-
-  current_position_ = 0;
-  SetPlayerState(base::playback_state_t::STOPPED);
-
-  return true;
+  Unload();
 }
 
 bool UriPlayer::Load(const std::string &str) {
-  GMP_DEBUG_PRINT("load: %s", str.c_str());
-
   GMPASSERT(!str.empty());
-
+  GMP_DEBUG_PRINT("load: %s", str.c_str());
   ParseOptionString(str);
-  SetGstreamerDebug();
-  gst_init(NULL, NULL);
-  gst_pb_utils_init();
+
+  // Temporary setting
+  display_mode_ = std::string("Textured");
+
   if (!GetSourceInfo()) {
     GMP_DEBUG_PRINT("get source information failed!");
     return false;
   }
 
-#ifndef PLATFORM_QEMUX86
-  // TODO(someone): check return value of acquire.
-  // Should use wxh value for acquire.
-  if (!service_->acquire(source_info_, display_path_)) {
+  ACQUIRE_RESOURCE_INFO_T resource_info;
+  resource_info.sourceInfo = &source_info_;
+  resource_info.displayMode = const_cast<char*>(display_mode_.c_str());
+  resource_info.result = false;
+
+  if (cbFunction_)
+    cbFunction_(NOTIFY_ACQUIRE_RESOURCE, display_path_, nullptr, static_cast<void*>(&resource_info));
+
+  if (!resource_info.result) {
     GMP_DEBUG_PRINT("resouce acquire fail!");
     return false;
   }
-#endif
+
+  if (!attachSurface(true)) {
+    GMP_DEBUG_PRINT("attachSurface() failed");
+    return false;
+  }
 
   if (!LoadPipeline()) {
     GMP_DEBUG_PRINT("pipeline load failed!");
     return false;
   }
 
-  positionTimer_id_ = g_timeout_add(UPDATE_INTERVAL_MS,
+  currPosTimerId_ = g_timeout_add(UPDATE_INTERVAL_MS,
                             (GSourceFunc)NotifyCurrentTime, this);
 
   /* Notify buffering time in case of httpsource only */
@@ -119,18 +87,35 @@ bool UriPlayer::Load(const std::string &str) {
 
   SetPlayerState(base::playback_state_t::LOADED);
 
+  this->SetReloading(gmp::parser::Parser(str.c_str()).get_start_time());
+
   GMP_DEBUG_PRINT("Load Done: %s", uri_.c_str());
   return true;
 }
 
-bool UriPlayer::Unload() {
+bool UriPlayer::UnloadImpl() {
   GMP_DEBUG_PRINT("unload");
 
-  if (!Finalize())
-    return false;
+  if (queue2_)
+    g_object_unref(queue2_);
 
-  service_->Notify(NOTIFY_UNLOAD_COMPLETED);
-  return service_->Stop();
+  if (bufferingTimer_id_) {
+    g_source_remove(bufferingTimer_id_);
+    bufferingTimer_id_ = 0;
+  }
+  current_position_ = 0;
+
+  SetPlayerState(base::playback_state_t::STOPPED);
+
+  if (!detachSurface()) {
+    GMP_DEBUG_PRINT("detachSurface() failed");
+    return false;
+  }
+
+  if (cbFunction_)
+    cbFunction_(NOTIFY_UNLOAD_COMPLETED, 0, nullptr, nullptr);
+
+  return true;
 }
 
 bool UriPlayer::Play() {
@@ -146,7 +131,7 @@ bool UriPlayer::Play() {
     return true;
   }
 
-  std::lock_guard<std::mutex> lock(lock_);
+  std::lock_guard<std::recursive_mutex> lock(recursive_mutex_);
   if (!buffering_) {
     if (!gst_element_set_state(pipeline_, GST_STATE_PLAYING))
       return false;
@@ -154,7 +139,8 @@ bool UriPlayer::Play() {
 
   SetPlayerState(base::playback_state_t::PLAYING);
 
-  service_->Notify(NOTIFY_PLAYING);
+  if (cbFunction_)
+    cbFunction_(NOTIFY_PLAYING, 0, nullptr, nullptr);
 
   return true;
 }
@@ -177,13 +163,16 @@ bool UriPlayer::Pause() {
 
   SetPlayerState(base::playback_state_t::PAUSED);
 
-  service_->Notify(NOTIFY_PAUSED);
+  if (cbFunction_)
+    cbFunction_(NOTIFY_PAUSED, 0, nullptr, nullptr);
+
   return true;
 }
 
 bool UriPlayer::SetPlayRate(const double rate) {
   GMP_DEBUG_PRINT("SetPlayRate: %lf", rate);
-  std::lock_guard<std::mutex> lock(lock_);
+
+  std::lock_guard<std::recursive_mutex> lock(recursive_mutex_);
 
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline is null");
@@ -203,7 +192,8 @@ bool UriPlayer::SetPlayRate(const double rate) {
   play_rate_ = rate;
   seeking_ = true;
 
-  GMP_DEBUG_PRINT("rate: %lf, position: %lld, duration: %lld",
+  GMP_DEBUG_PRINT("rate: %lf, position: %" G_GINT64_FORMAT
+                  ", duration: %" G_GINT64_FORMAT,
                   rate, current_position_, duration_);
 
   if (rate > 0.0) {
@@ -225,8 +215,8 @@ bool UriPlayer::SetPlayRate(const double rate) {
 }
 
 bool UriPlayer::Seek(const int64_t msecond) {
-  GMP_DEBUG_PRINT("Seek: %lld", msecond);
-  std::lock_guard<std::mutex> lock(lock_);
+  GMP_DEBUG_PRINT("Seek:  %" G_GINT64_FORMAT, msecond);
+  std::lock_guard<std::recursive_mutex> lock(recursive_mutex_);
 
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline is null");
@@ -253,29 +243,6 @@ bool UriPlayer::SetVolume(int volume) {
 
   g_object_set(G_OBJECT(pipeline_), "volume", (gdouble) (volume / 100.0), NULL);
   return true;
-}
-
-bool UriPlayer::SetPlane(int planeId) {
-  GMP_DEBUG_PRINT("setPlane planeId:(%d)", planeId);
-  planeId_ = planeId;
-
-  return true;
-}
-
-bool UriPlayer::SetDisplayResource(gmp::base::disp_res_t &res) {
-  GMP_DEBUG_PRINT("setDisplayResource planeId:(%d), crtcId:(%d), connId(%d)", res.plane_id, res.crtc_id, res.conn_id);
-  planeId_ = res.plane_id;
-  crtcId_ = res.crtc_id;
-  connId_ = res.conn_id;
-  return true;
-}
-
-void UriPlayer::Initialize(gmp::service::IService *service) {
-  GMP_DEBUG_PRINT("service = %p", service);
-  if (!service)
-    return;
-
-  service_ = service;
 }
 
 bool UriPlayer::GetSourceInfo() {
@@ -305,12 +272,12 @@ bool UriPlayer::GetSourceInfo() {
 
     video_stream_info.width = gst_discoverer_video_info_get_width(video);
     video_stream_info.height = gst_discoverer_video_info_get_height(video);
-    video_stream_info.codec = GMP_VIDEO_CODEC_NONE;
+    video_stream_info.codec = 0;
     video_stream_info.bit_rate = gst_discoverer_video_info_get_bitrate(video);
     video_stream_info.frame_rate.num = gst_discoverer_video_info_get_framerate_num(video);
     video_stream_info.frame_rate.den = gst_discoverer_video_info_get_framerate_denom(video);
 
-    GMP_DEBUG_PRINT("[video info] width: %d, height: %d, bitRate: %lld, frameRate: %d/%d",
+    GMP_DEBUG_PRINT("[video info] width: %d, height: %d, bitRate: %lu, frameRate: %d/%d",
                    video_stream_info.width,
                    video_stream_info.height,
                    video_stream_info.bit_rate,
@@ -324,11 +291,11 @@ bool UriPlayer::GetSourceInfo() {
     GList *first = g_list_first(audio_info);
     GstDiscovererAudioInfo *audio
       = reinterpret_cast<GstDiscovererAudioInfo *>(first->data);
-    audio_stream_info.codec = GMP_AUDIO_CODEC_NONE;
+    audio_stream_info.codec = 0;
     audio_stream_info.bit_rate = gst_discoverer_audio_info_get_bitrate(audio);
     audio_stream_info.sample_rate
       = gst_discoverer_audio_info_get_sample_rate(audio);
-    GMP_DEBUG_PRINT("[audio info] bitRate: %lld, sampleRate: %d",
+    GMP_DEBUG_PRINT("[audio info] bitRate: %lu, sampleRate: %d",
                    audio_stream_info.bit_rate,
                    audio_stream_info.sample_rate);
   } else {
@@ -349,7 +316,7 @@ bool UriPlayer::GetSourceInfo() {
 
   GMP_DEBUG_PRINT("Width: : %d", video_stream_info.width);
   GMP_DEBUG_PRINT("Height: : %d", video_stream_info.height);
-  GMP_DEBUG_PRINT("Duration: : %lld", duration);
+  GMP_DEBUG_PRINT("Duration: : %lu", duration);
 
   g_clear_error(&err);
   gst_discoverer_stream_info_list_free(video_info);
@@ -361,7 +328,8 @@ bool UriPlayer::GetSourceInfo() {
 
 void UriPlayer::NotifySourceInfo() {
   // TODO(anonymous): Support multiple video/audio stream case
-  service_->Notify(NOTIFY_SOURCE_INFO, &source_info_);
+  if (cbFunction_)
+    cbFunction_(NOTIFY_SOURCE_INFO, 0, nullptr, &source_info_);
 }
 
 gboolean UriPlayer::HandleBusMessage(GstBus *bus,
@@ -378,13 +346,15 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
   switch (GST_MESSAGE_TYPE(message)) {
     case GST_MESSAGE_ERROR: {
       base::error_t error = player->HandleErrorMessage(message);
-      player->service_->Notify(NOTIFY_ERROR, &error);
+      if (player->cbFunction_)
+        player->cbFunction_(NOTIFY_ERROR, 0, nullptr, &error);
       break;
     }
 
     case GST_MESSAGE_EOS: {
       GMP_DEBUG_PRINT("Got endOfStream");
-      player->service_->Notify(NOTIFY_END_OF_STREAM);
+      if (player->cbFunction_)
+        player->cbFunction_(NOTIFY_END_OF_STREAM, 0, nullptr, nullptr);
       break;
     }
 
@@ -394,11 +364,12 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       auto notify_case = NOTIFY_MAX;
 
       {
-        std::lock_guard<std::mutex> lock(player->lock_);
+        std::lock_guard<std::recursive_mutex> lock(player->recursive_mutex_);
 
         if (!player->load_complete_) {
           player->load_complete_ = true;
           notify_case = NOTIFY_LOAD_COMPLETED;
+          player->DoReloading();
         } else if (player->seeking_) {
           player->seeking_ = false;
           player->buffering_time_updated_ = true;
@@ -406,20 +377,46 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
         }
       }
 
-      if (notify_case == NOTIFY_LOAD_COMPLETED) {
-        player->service_->Notify(NOTIFY_LOAD_COMPLETED);
-      } else if (notify_case == NOTIFY_SEEK_DONE) {
-        player->service_->Notify(NOTIFY_SEEK_DONE);
-      }
+      if (player->cbFunction_ || (notify_case == NOTIFY_LOAD_COMPLETED) || (notify_case == NOTIFY_SEEK_DONE))
+        player->cbFunction_(notify_case, 0, nullptr, nullptr);
+      break;
+    }
 
+    case GST_STATE_PAUSED: {
+      GMP_DEBUG_PRINT("PAUSED");
+      if (player->cbFunction_)
+        player->cbFunction_(NOTIFY_PAUSED, 0, nullptr, nullptr);
+      break;
+    }
+
+    case GST_STATE_PLAYING: {
+      GMP_DEBUG_PRINT("PLAYING");
+      if (player->cbFunction_)
+        player->cbFunction_(NOTIFY_PLAYING, 0, nullptr, nullptr);
       break;
     }
 
     case GST_MESSAGE_STATE_CHANGED: {
-      GstElement *pipeline = player->pipeline_;
-      if (GST_MESSAGE_SRC(message) == GST_OBJECT_CAST(pipeline))
-        player->HandleStateMessage(message);
+      GstState old_state, new_state;
+      gst_message_parse_state_changed(message, &old_state, &new_state, NULL);
 
+      GMP_INFO_PRINT("Element [ %s ] State changed ...%s -> %s",
+                GST_MESSAGE_SRC_NAME(message),
+                gst_element_state_get_name(old_state),
+                gst_element_state_get_name(new_state));
+
+      GstElement *pipeline = player->pipeline_;
+      if (GST_MESSAGE_SRC(message) == GST_OBJECT_CAST(pipeline)) {
+        // generate dot graph when play start only(READY -> PAUSED)
+        if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED) {
+          GMP_DEBUG_PRINT("Generate dot graph from %s state to %s state.",
+                gst_element_state_get_name(old_state),
+                gst_element_state_get_name(new_state));
+          std::string dump_name("g-media-pipeline[" + std::to_string(getpid()) + "]");
+          GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN (pipeline),
+                GST_DEBUG_GRAPH_SHOW_ALL, dump_name.c_str());
+        }
+      }
       break;
     }
 
@@ -447,9 +444,12 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
         video_info.frame_rate.den = fps_d;
         // TODO: we already know this info. but it's not used now.
         video_info.bit_rate = 0;
-        video_info.codec = GMP_VIDEO_CODEC_NONE;
+        video_info.codec = 0;
 
-        player->service_->Notify(NOTIFY_VIDEO_INFO, &video_info);
+        if (player->cbFunction_)
+          player->cbFunction_(NOTIFY_VIDEO_INFO, 0, nullptr, &video_info);
+      } else if (gst_structure_has_name(gStruct, "request-resource")) {
+        GMP_INFO_PRINT("got request-resource message");
       }
       break;
     }
@@ -464,18 +464,20 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       gst_message_parse_buffering(message, &percent);
 
       /* FIXME: we should notify buffering message only one for each case */
-      std::lock_guard<std::mutex> lock(player->lock_);
+      std::lock_guard<std::recursive_mutex> lock(player->recursive_mutex_);
       if (percent == 100) {
         player->buffering_ = false;
         if (state == base::playback_state_t::PLAYING && player->load_complete_)
           gst_element_set_state(player->pipeline_, GST_STATE_PLAYING);
-        player->service_->Notify(NOTIFY_BUFFERING_END);
+        if (player->cbFunction_)
+          player->cbFunction_(NOTIFY_BUFFERING_END, 0, nullptr, nullptr);
         GMP_DEBUG_PRINT("Buffering done!");
       } else if (percent == 0) {
         player->buffering_ = true;
         if (state == base::playback_state_t::PLAYING)
           gst_element_set_state(player->pipeline_, GST_STATE_PAUSED);
-        player->service_->Notify(NOTIFY_BUFFERING_START);
+        if (player->cbFunction_)
+          player->cbFunction_(NOTIFY_BUFFERING_START, 0, nullptr, nullptr);
         GMP_DEBUG_PRINT("Buffering...");
       }
       break;
@@ -485,6 +487,66 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
   }
 
   return true;
+}
+
+GstBusSyncReply UriPlayer::HandleSyncBusMessage(GstBus * bus,
+                                                GstMessage * msg, gpointer data)
+{
+  // This handler will be invoked synchronously, don't process any application
+  // message handling here
+  LSM::Connector *connector = static_cast<LSM::Connector*>(data);
+
+  switch (GST_MESSAGE_TYPE (msg)) {
+    case GST_MESSAGE_NEED_CONTEXT:{
+      const gchar *type = nullptr;
+      gst_message_parse_context_type(msg, &type);
+      if (g_strcmp0 (type, waylandDisplayHandleContextType) != 0) {
+        break;
+      }
+        GMP_DEBUG_PRINT("Set a wayland display handle : %p", connector->getDisplay());
+      if (connector->getDisplay()) {
+        GstContext *context = gst_context_new(waylandDisplayHandleContextType, TRUE);
+        gst_structure_set(gst_context_writable_structure (context),
+            "handle", G_TYPE_POINTER, connector->getDisplay(), nullptr);
+        gst_element_set_context(GST_ELEMENT(GST_MESSAGE_SRC(msg)), context);
+      }
+      goto drop;
+    }
+    case GST_MESSAGE_ELEMENT:{
+      if (!gst_is_video_overlay_prepare_window_handle_message(msg)) {
+        break;
+      }
+      GMP_DEBUG_PRINT("Set wayland window handle : %p", connector->getSurface());
+      if (connector->getSurface()) {
+        GstVideoOverlay *videoOverlay = GST_VIDEO_OVERLAY(GST_MESSAGE_SRC(msg));
+        gst_video_overlay_set_window_handle(videoOverlay,
+            (guintptr)(connector->getSurface()));
+
+        gint video_disp_height = 0;
+        gint video_disp_width = 0;
+        connector->getVideoSize(video_disp_width, video_disp_height);
+        if (video_disp_width && video_disp_height) {
+          gint display_x = (1920 - video_disp_width) / 2;
+          gint display_y = (1080 - video_disp_height) / 2;
+          GMP_DEBUG_PRINT("Set render rectangle :(%d, %d, %d, %d)",
+                          display_x, display_y, video_disp_width, video_disp_height);
+          gst_video_overlay_set_render_rectangle(videoOverlay,
+              display_x, display_y, video_disp_width, video_disp_height);
+
+          gst_video_overlay_expose(videoOverlay);
+        }
+      }
+      goto drop;
+    }
+    default:
+      break;
+  }
+
+  return GST_BUS_PASS;
+
+drop:
+  gst_message_unref(msg);
+  return GST_BUS_DROP;
 }
 
 bool UriPlayer::LoadPipeline() {
@@ -525,17 +587,58 @@ bool UriPlayer::LoadPipeline() {
   g_signal_connect(G_OBJECT(pipeline_), "source-setup", G_CALLBACK(sourceSetupCB), this);
   g_signal_connect(G_OBJECT(pipeline_), "element-setup", G_CALLBACK(elementSetupCB), this);
 
-  GstElement *aSink = gst_element_factory_make("alsasink", "audio-sink");
-
+  std::string aSinkName = (use_audio ? "audio-sink" : "fake-sink");
+  GstElement *aSink = pf::ElementFactory::Create("playbin", aSinkName, display_path_);
   if (!aSink ) {
     GMP_DEBUG_PRINT("ERROR : Cannot create audio sink element!");
     return false;
   }
-#ifdef PLATFORM_QEMUX86
-  GstElement *vSink = gst_element_factory_make("waylandsink", "video-sink");
-#else
-  GstElement *vSink = gst_element_factory_make("kmssink", NULL);
-#endif
+
+  GstElement *vSink = nullptr;
+  GstElement *videoConvert =
+        pf::ElementFactory::Create("playbin", "video-converter");
+  if (videoConvert) {
+    vSink = gst_bin_new("video-sink-bin");
+    GstElement *videoSink =
+        pf::ElementFactory::Create("playbin", "video-sink");
+    if (vSink && videoSink) {
+      GstElement *capsFilter =
+          gst_element_factory_make("capsfilter", "video-caps-filter");
+      if (capsFilter) {
+        GstCaps *videoCaps = gst_caps_new_simple (
+            "video/x-raw", "format", G_TYPE_STRING, "RGB16", NULL);
+        if (videoCaps)
+          g_object_set(G_OBJECT(capsFilter), "caps", videoCaps, NULL);
+      } else {
+        GMP_DEBUG_PRINT("ERROR : Cannot create video sink element!");
+        gst_object_unref (GST_OBJECT (vSink));
+        gst_object_unref (GST_OBJECT (videoSink));
+        return false;
+      }
+
+      gint scale_width = VIDEO_SCALE_WIDTH;
+      gint scale_height = (source_info_.video_streams[0].height * scale_width) /
+                         source_info_.video_streams[0].width;
+      lsm_connector_.setVideoSize(scale_width, scale_height);
+
+      gst_bin_add_many(GST_BIN(vSink), videoConvert, capsFilter, videoSink, NULL);
+      if (!gst_element_link_many(videoConvert, capsFilter, videoSink, NULL)) {
+        GMP_DEBUG_PRINT("video-sink-bin elements link failed!!!");
+        return false;
+      }
+
+      GstPad *pad = gst_element_get_static_pad(videoConvert, "sink");
+      GstPad *ghostPad = gst_ghost_pad_new("sink", pad);
+      gst_pad_set_active(ghostPad, TRUE);
+      gst_element_add_pad(vSink, ghostPad);
+      gst_object_unref(pad);
+    } else {
+      GMP_DEBUG_PRINT("vSink (%p), videoSink(%p) failed", vSink, videoSink);
+    }
+  }
+
+  if (!vSink)
+    vSink = pf::ElementFactory::Create("playbin", "video-sink");
 
   if (!vSink) {
     GMP_DEBUG_PRINT("ERROR : Cannot create video sink element!");
@@ -543,26 +646,15 @@ bool UriPlayer::LoadPipeline() {
     return false;
   }
 
-#ifndef PLATFORM_QEMUX86
-  g_object_set(G_OBJECT(vSink), "driver-name", "vc4", NULL);
-#endif
-
   g_object_set(G_OBJECT(pipeline_), "uri", uri_.c_str(),
                                     "video-sink", vSink,
-                                    "audio-sink", aSink, NULL);
-
-  if (planeId_ > 0) {
-    GMP_DEBUG_PRINT("Plane Id setting with %d",planeId_);
-    g_object_set(G_OBJECT(vSink), "plane-id", planeId_, NULL);
-  }
-
-  if (connId_ > 0) {
-    GMP_DEBUG_PRINT("Conn Id setting with %d",connId_);
-    g_object_set(G_OBJECT(vSink), "connector-id", connId_, NULL);
-  }
+                                    aSinkName.c_str(), aSink, NULL);
 
   GstBus *bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline_));
   gst_bus_add_watch(bus, UriPlayer::HandleBusMessage, this);
+  gst_bus_set_sync_handler(bus, UriPlayer::HandleSyncBusMessage,
+                           &lsm_connector_, NULL);
+
   gst_object_unref(bus);
   GMP_DEBUG_PRINT("LoadPipeline Done");
   return gst_element_set_state(pipeline_, GST_STATE_PAUSED);
@@ -570,7 +662,7 @@ bool UriPlayer::LoadPipeline() {
 
 gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
   UriPlayer *player = reinterpret_cast<UriPlayer *>(user_data);
-  std::lock_guard<std::mutex> lock(player->lock_);
+  std::lock_guard<std::recursive_mutex> lock(player->recursive_mutex_);
   gint64 pos = 0;
 
   if (!player->pipeline_ || player->seeking_ || !player->load_complete_)
@@ -583,21 +675,30 @@ gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {
   player->current_position_ = pos;
 
   pos = GST_TIME_AS_MSECONDS(pos);
-  player->service_->Notify(NOTIFY_CURRENT_TIME, &pos);
-  GMP_DEBUG_PRINT("Current position: [%" G_GINT64_FORMAT " ms]", pos);
+  if (player->cbFunction_)
+    player->cbFunction_(NOTIFY_CURRENT_TIME, 0, nullptr, &pos);
+  //GMP_DEBUG_PRINT("Current position: [%" G_GINT64_FORMAT " ms]", pos);
+
+  gint64 inSecs = pos / 1000;
+  gint hours = inSecs / 3600;
+  gint minutes = (inSecs - (3600 * hours)) / 60;
+  gint seconds = (inSecs - (3600 * hours) - (minutes * 60));
+  GMP_DEBUG_PRINT("Current Position: %" G_GINT64_FORMAT " [%02d:%02d:%02d]",
+                    pos, hours, minutes, seconds);
 
   return true;
 }
 
 gboolean UriPlayer::NotifyBufferingTime(gpointer user_data) {
   UriPlayer *player = reinterpret_cast<UriPlayer *>(user_data);
-  std::lock_guard<std::mutex> lock(player->lock_);
+  std::lock_guard<std::recursive_mutex> lock(player->recursive_mutex_);
 
   if (!player->pipeline_ || player->seeking_ || !player->load_complete_)
     return true;
 
   base::buffer_range_t bufferRange = player->CalculateBufferingTime();
-  player->service_->Notify(NOTIFY_BUFFER_RANGE, &bufferRange);
+  if (player->cbFunction_)
+    player->cbFunction_(NOTIFY_BUFFER_RANGE, 0, nullptr, &bufferRange);
 
   return true;
 }
@@ -658,7 +759,7 @@ base::buffer_range_t UriPlayer::CalculateBufferingTime() {
   buffered_time_ = buffering_time;
 
   GMP_DEBUG_PRINT("buffering_time[%" G_GINT64_FORMAT " ms] -> [%" G_GINT64_FORMAT " sec]",
-                    buffering_time, buffering_time / 1000);
+                   buffering_time, buffering_time / 1000);
 
   /*
    * beginTime = ms
@@ -693,34 +794,6 @@ base::error_t UriPlayer::HandleErrorMessage(GstMessage *message) {
   g_free(debug_info);
 
   return error;
-}
-
-void UriPlayer::HandleStateMessage(GstMessage *message) {
-  GstState old_state, new_state;
-  gst_message_parse_state_changed(message, &old_state, &new_state, NULL);
-
-  switch (new_state) {
-    case GST_STATE_PAUSED: {
-      GMP_DEBUG_PRINT("PAUSED");
-      service_->Notify(NOTIFY_PAUSED);
-      break;
-    }
-
-    case GST_STATE_PLAYING: {
-      GMP_DEBUG_PRINT("PLAYING");
-      service_->Notify(NOTIFY_PLAYING);
-      break;
-    }
-  }
-  // generate dot graph when play start only(READY -> PAUSED)
-  if (old_state == GST_STATE_READY && new_state == GST_STATE_PAUSED) {
-    GMP_DEBUG_PRINT("Generate dot graph from %s state to %s state.",
-          gst_element_state_get_name(old_state),
-          gst_element_state_get_name(new_state));
-    std::string dump_name("g-media-pipeline[" + std::to_string(getpid()) + "]");
-    GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN (pipeline_),
-          GST_DEBUG_GRAPH_SHOW_ALL, dump_name.c_str());
-  }
 }
 
 int32_t UriPlayer::ConvertErrorCode(GQuark domain, gint code) {
@@ -769,32 +842,6 @@ int32_t UriPlayer::ConvertErrorCode(GQuark domain, gint code) {
   return converted;
 }
 
-void UriPlayer::SetGstreamerDebug() {
-  GMP_DEBUG_PRINT("");
-  const char *kDebug = "GST_DEBUG";
-  const char *kDebugFile = "GST_DEBUG_FILE";
-  const char *kDebugDot = "GST_DEBUG_DUMP_DOT_DIR";
-
-  pbnjson::JValue parsed
-   = pbnjson::JDomParser::fromFile("/etc/g-media-pipeline/gst_debug.conf");
-
-  if (!parsed.isObject()) {
-    GMP_DEBUG_PRINT("Debug file parsing error");
-    return;
-  }
-
-  pbnjson::JValue debug = parsed["gst_debug"];
-
-  for (int i = 0; i < debug.arraySize(); i++) {
-    if (debug[i].hasKey(kDebug) && !debug[i][kDebug].asString().empty())
-      setenv(kDebug, debug[i][kDebug].asString().c_str(), 1);
-    if (debug[i].hasKey(kDebugFile) && !debug[i][kDebugFile].asString().empty())
-      setenv(kDebugFile, debug[i][kDebugFile].asString().c_str(), 1);
-    if (debug[i].hasKey(kDebugDot) && !debug[i][kDebugDot].asString().empty())
-      setenv(kDebugDot, debug[i][kDebugDot].asString().c_str(), 1);
-  }
-}
-
 void UriPlayer::ParseOptionString(const std::string &str) {
   GMP_DEBUG_PRINT("option string: %s", str.c_str());
 
@@ -805,13 +852,28 @@ void UriPlayer::ParseOptionString(const std::string &str) {
   }
   pbnjson::JValue parsed = jdparser.getDom();
 
-  uri_ = parsed["uri"].asString();
-  if (parsed["options"]["option"].hasKey("display-path")) {
-    int32_t display_path = parsed["options"]["option"]["display-path"].asNumber<int32_t>();
-    display_path_ = (display_path >= MAX_NUM_DISPLAY ? 0 : display_path);
+  if(parsed.hasKey("uri")) {
+    uri_ = parsed["uri"].asString();
+  }
+  else {
+    GMP_DEBUG_PRINT("UMS_INTERNAL_API_VERSION is not version 2.");
+    GMP_DEBUG_PRINT("Please check the UMS_INTERNAL_API_VERSION in ums.");
+    GMPASSERT(0);
   }
 
-  GMP_DEBUG_PRINT("uri: %s, display-path: %d", uri_.c_str(), display_path_);
+  if (parsed["options"]["option"].hasKey("displayPath")) {
+    int32_t display_path = parsed["options"]["option"]["displayPath"].asNumber<int32_t>();
+    display_path_ = (display_path > SECONDARY_DISPLAY ? 0 : display_path);
+  }
+  if (parsed["options"]["option"].hasKey("windowId")) {
+    window_id_ = parsed["options"]["option"]["windowId"].asString();
+  }
+  if (parsed["options"]["option"].hasKey("videoDisplayMode")) {
+    display_mode_ = parsed["options"]["option"]["videoDisplayMode"].asString();
+  }
+
+  GMP_DEBUG_PRINT("uri: %s, display-path: %d, window_id: %s, display_mode: %s",
+    uri_.c_str(), display_path_, window_id_.c_str(), display_mode_.c_str());
 }
 
 }  // namespace player

@@ -8,10 +8,11 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
+
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef SRC_LOG_LOG_H_
@@ -33,7 +34,7 @@ PmLogContext GetPmLogContext();
     PmLogDebug(GetPmLogContext(), \
     "[%s:%d]" FORMAT__, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__)
 
-#define GMP_LOG_OBJ_SET(OBJ__)           PmLogContext GetPmLogContext_##OBJ__()
+#define GMP_LOG_OBJ_SET(OBJ__) PmLogContext GetPmLogContext_##OBJ__()
 #define GMP_LOG_OBJ_CRITICAL(OBJ__, ...) \
     PmLogCritical(GetPmLogContext_##OBJ__(), ##__VA_ARGS__)
 #define GMP_LOG_OBJ_ERROR(OBJ__, ...) \

@@ -17,38 +17,30 @@
 #ifndef SRC_PLAYER_PLAYER_H_
 #define SRC_PLAYER_PLAYER_H_
 
-#include <glib.h>
-#include <glib-unix.h>
-#include <gst/gst.h>
 #include <string>
 #include <memory>
 #include <thread>
 #include <mutex>
-#include <gst/player/player.h>
-#include <gst/pbutils/pbutils.h>
-#include <boost/core/noncopyable.hpp>
+#include <uMediaTypes.h>
+#include <lsm_connector.h>
 
-#include "types.h"
+#include <base/types.h>
 
-namespace gmp { namespace service { class IService; }}
-namespace gmp { namespace resource { class ResourceRequestor; }}
+#include "PlayerTypes.h"
+#include "mediaplayerclient/MediaPlayerClient.h"
+#include "log/log.h"
+
+static constexpr char const *waylandDisplayHandleContextType =
+	"GstWaylandDisplayHandleContextType";
 
 namespace gmp { namespace player {
-class Player : private boost::noncopyable {
+class Player {
  public:
-  Player()
-    : pipeline_(NULL)
-    , service_(NULL)
-    , play_rate_(1.0)
-    , duration_(0)
-    , load_complete_(false)
-    , seeking_(false)
-    , current_position_(0)
-    , reloading_(false)
-    , reload_seek_position_(0) {}
+  Player() {}
   virtual ~Player() {}
 
   virtual bool Load(const std::string &str) = 0;
+  virtual bool Load(const MEDIA_LOAD_DATA_T* loadData) = 0;
   virtual bool Unload() = 0;
   virtual bool Play() = 0;
   virtual bool Pause() = 0;
@@ -56,85 +48,16 @@ class Player : private boost::noncopyable {
   virtual bool Seek(const int64_t position) = 0;
   virtual bool SetVolume(int volume) = 0;
   virtual bool SetPlane(int planeId) = 0;
-  virtual bool SetDisplayResource(gmp::base::disp_res_t &res) = 0;
-  virtual void Initialize(gmp::service::IService *service) = 0;
+  virtual bool SetDisplayPath(const uint32_t display_path) = 0;
 
-  bool reloading_;
-  gint64 reload_seek_position_;
-
- protected:
-  GstElement *pipeline_;
-  gmp::service::IService *service_;
-  double play_rate_;
-  gint64 duration_;
-  bool load_complete_;
-  bool seeking_;
-  gint64 current_position_;
-};
-
-class UriPlayer : public Player {
- public:
-  UriPlayer();
-  ~UriPlayer();
-  bool Load(const std::string &str) override;
-  bool Unload() override;
-  bool Play() override;
-  bool Pause() override;
-  bool SetPlayRate(const double rate) override;
-  bool Seek(const int64_t position) override;
-  bool SetVolume(int volume) override;
-  bool SetPlane(int planeId) override;
-  bool SetDisplayResource(gmp::base::disp_res_t &res) override;
-  void Initialize(gmp::service::IService *service) override;
-  static gboolean HandleBusMessage(GstBus *bus,
-                                   GstMessage *message, gpointer user_data);
-  static gboolean NotifyCurrentTime(gpointer user_data);
-  static gboolean NotifyBufferingTime(gpointer user_data);
-
- private:
-  void NotifySourceInfo();
-  bool GetSourceInfo();
-  bool LoadPipeline();
-  base::error_t HandleErrorMessage(GstMessage *message);
-  void HandleStateMessage(GstMessage *message);
-  int32_t ConvertErrorCode(GQuark domain, gint code);
-  void SetGstreamerDebug();
-  base::buffer_range_t CalculateBufferingTime();
-  base::playback_state_t GetPlayerState() const {
-    std::lock_guard<std::mutex> lock(state_lock_);
-    return current_state_;
-  }
-  bool SetPlayerState(base::playback_state_t state) {
-    std::lock_guard<std::mutex> lock(state_lock_);
-    current_state_ = state;
-    return true;
-  }
-  void ParseOptionString(const std::string &str);
-  bool Finalize();
-
-  base::source_info_t source_info_;
-  std::string uri_;
-  guint positionTimer_id_;
-  std::shared_ptr<gmp::resource::ResourceRequestor> res_requestor_;
-  std::string connectID_;
-  int32_t planeId_;
-  int32_t crtcId_;
-  int32_t connId_;
-  int32_t display_path_;
-  bool httpSource_;
-  mutable std::mutex state_lock_;
-  std::mutex lock_;
-
-  /* buffering variable */
-  GstElement *queue2_;
-  guint bufferingTimer_id_;
-  bool buffering_;
-  bool buffering_time_updated_;
-  gint64 buffered_time_;
-  base::playback_state_t current_state_;
-  const gint queue2MaxSizeBytes = 24 * 1024 * 1024;
-  const gint64 queue2MaxSizeTime = 10 * GST_SECOND;
-  const gint64 queue2MaxSizeMsec = GST_TIME_AS_MSECONDS(queue2MaxSizeTime);
+  virtual void notifyFunctionUMSPolicyAction() = 0;
+  virtual bool UpdateVideoResData(const gmp::base::source_info_t &sourceInfo) = 0;
+  virtual MEDIA_STATUS_T Feed(const guint8* pBuffer, guint32 bufferSize,
+                        guint64 pts, MEDIA_DATA_CHANNEL_T esData) = 0;
+  virtual bool Flush() = 0;
+  virtual void RegisterCbFunction(CALLBACK_T) = 0;
+  virtual bool PushEndOfStream() = 0;
+  virtual GstElement* GetPipeline() = 0;
 };
 
 }  // namespace player

@@ -18,29 +18,28 @@
 #define SRC_MEDIAPLAYERCLIENT_MEDIAPLAYERCLIENT_H_
 
 #include <glib.h>
-
 #include <vector>
 #include <string>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
-#include "PlayerTypes.h"
 #include "types.h"
+#include "PlayerTypes.h"
 
 namespace gmp { namespace resource { class ResourceRequestor; }}
 namespace gmp { namespace player {
 
-class BufferPlayer;
+class Player;
 
 class MediaPlayerClient {
  public:
-    MediaPlayerClient(const std::string& appId);
+    MediaPlayerClient(const std::string& appId = "", const std::string& connectionId = "");
     ~MediaPlayerClient();
 
     bool Load(const MEDIA_LOAD_DATA_T* loadData);
+    bool Load(const std::string &str);
+    bool Unload();
     bool Play();
     bool Pause();
-    bool Stop();
     bool Seek(int position);
     bool SetPlane(int planeId);
     MEDIA_STATUS_T Feed(const guint8* pBuffer,
@@ -62,26 +61,43 @@ class MediaPlayerClient {
                                 const long destWidth,
                                 const long destHeight,
                                 const bool isFullScreen);
-    bool RegisterCallback(GMP_CALLBACK_FUNCTION_T cbFunction, void* userData);
+    void RegisterCallback(CALLBACK_T cbFunction) { userCallback_ = cbFunction; }
+    void RegisterCallback(CALLBACK_T cbFunction, void* user_data)
+      { RegisterCallback(cbFunction); userData_ = user_data; }
     bool PushEndOfStream();
-    bool NotifyForeground();
-    bool NotifyBackground();
+    bool NotifyForeground() const;
+    bool NotifyBackground() const;
+    bool NotifyActivity() const;
     bool SetVolume(int volume);
     bool SetExternalContext(GMainContext *context);
     bool SetPlaybackRate(const double playbackRate);
+    bool AcquireResources(base::source_info_t &sourceInfo,
+                            const std::string &display_mode = "Default", uint32_t display_path = 0);
+    bool ReleaseResources();
     const char* GetMediaID();
+    void NotifyFunction(const gint type, const gint64 numValue, const gchar *strValue, void *udata);
+    GstElement* GetPipeline();
 
  private:
-    base::source_info_t GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);
+    void LoadCommon();
+    void RunCallback(const gint type, const gint64 numValue, const gchar *strValue, void *udata);
 
-    std::unique_ptr<gmp::player::BufferPlayer> player_;
-    GMainContext *playerContext_;
+    std::shared_ptr<gmp::player::Player> player_;
+    GMainContext *playerContext_ = nullptr;
 
-    bool isStopCalled_;
+    bool isLoaded_ = false;
+    std::unique_ptr<gmp::resource::ResourceRequestor> resourceRequestor_;
+
+    std::string appId_;
+    std::string connectionId_;
+
+    CALLBACK_T userCallback_ = nullptr;
+    void* userData_ = nullptr;
+
+    GMP_PLAYER_TYPE playerType_;
 };
 
 }  // namespace player
 }  // namespace gmp
-
 
 #endif  // SRC_MEDIAPLAYERCLIENT_MEDIAPLAYERCLIENT_H_

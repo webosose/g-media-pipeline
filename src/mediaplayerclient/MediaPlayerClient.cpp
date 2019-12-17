@@ -15,140 +15,224 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "MediaPlayerClient.h"
-
-#include "BufferPlayer.h"
+#include "Player.h"
 #include "log.h"
+#include "ElementFactory.h"
+#include "requestor.h"
+#include "PlayerFactory.h"
+
+#include "parser/parser.h"
 
 namespace gmp { namespace player {
 
-MediaPlayerClient::MediaPlayerClient(const std::string& appId)
-    : playerContext_(NULL),
-      isStopCalled_(false) {
-  player_.reset(new gmp::player::BufferPlayer(appId));
-  GMP_INFO_PRINT(" Player Created [%p]", player_.get());
+MediaPlayerClient::MediaPlayerClient(const std::string& appId, const std::string& connectionId)
+  : appId_(appId)
+  , connectionId_(connectionId) {
+  GMP_DEBUG_PRINT("appId: %s, connectionId: %s", appId.c_str(), connectionId.c_str());
+
+  if (appId.empty())
+    GMP_DEBUG_PRINT("appId is empty! resourceRequestor is not created");
+  else
+    resourceRequestor_ = std::make_unique<gmp::resource::ResourceRequestor>(appId, connectionId);
 }
 
 MediaPlayerClient::~MediaPlayerClient() {
-  GMP_INFO_PRINT(" START");
-  Stop();
-  GMP_INFO_PRINT("END");
+  GMP_DEBUG_PRINT("");
+  if (isLoaded_) {
+    GMP_DEBUG_PRINT("Unload() should be called if it is still loaded");
+    Unload();
+  }
 }
 
+bool MediaPlayerClient::AcquireResources(base::source_info_t &sourceInfo,
+                                        const std::string &display_mode, uint32_t display_path) {
+  GMP_DEBUG_PRINT("");
+  gmp::resource::PortResource_t resourceMMap;
+  gmp::base::disp_res_t dispRes = {-1,-1,-1};
+
+  if (resourceRequestor_) {
+    if (!resourceRequestor_->setSourceInfo(sourceInfo)) {
+      GMP_DEBUG_PRINT("set source info failed");
+      return false;
+    }
+
+    if (!resourceRequestor_->acquireResources(nullptr, resourceMMap, display_mode, dispRes, display_path)) {
+      GMP_INFO_PRINT("resource acquisition failed");
+      return false;
+    }
+
+    for (auto it : resourceMMap) {
+      GMP_DEBUG_PRINT("Resource::[%s]=>index:%d", it.first.c_str(), it.second);
+    }
+  }
+
+  if (!player_->UpdateVideoResData(sourceInfo)) {
+    GMP_DEBUG_PRINT("ERROR: UpdateVideoResData");
+    return false;
+  }
+
+  return true;
+}
+
+bool MediaPlayerClient::ReleaseResources() {
+  GMP_DEBUG_PRINT("");
+  if (!resourceRequestor_)
+    return true;
+
+  return resourceRequestor_->releaseResource();
+}
+
+void MediaPlayerClient::LoadCommon() {
+  if (!NotifyForeground())
+    GMP_DEBUG_PRINT("NotifyForeground fails");
+
+  player_->RegisterCbFunction(
+      std::bind(&MediaPlayerClient::NotifyFunction, this,
+        std::placeholders::_1, std::placeholders::_2,
+        std::placeholders::_3, std::placeholders::_4));
+
+  if (resourceRequestor_) {
+    resourceRequestor_->registerUMSPolicyActionCallback([this]() {
+      NotifyFunction(NOTIFY_ERROR, GMP_ERROR_RES_ALLOC, nullptr, nullptr);
+      if (!NotifyBackground())
+        GMP_DEBUG_PRINT("NotifyBackground fails");
+    });
+  }
+}
+
+// Unmanaged case
 bool MediaPlayerClient::Load(const MEDIA_LOAD_DATA_T* loadData) {
   GMP_DEBUG_PRINT("Load loadData = %p", loadData);
+  playerType_ = GMP_PLAYER_TYPE_BUFFER;
+  player_ =
+      gmp::pf::PlayerFactory::CreatePlayer(loadData);
 
   if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+    GMP_INFO_PRINT("Error: Player not created");
     return false;
   }
 
-  player_->Initialize(NULL);
+  LoadCommon();
 
-#ifndef PLATFORM_QEMUX86
-  uint32_t display_path =
-      (loadData->displayPath >= MAX_NUM_DISPLAY) ? 0 : loadData->displayPath;
-  base::source_info_t source_info = GetSourceInfo(loadData);
-  if (!player_->AcquireResources(source_info, display_path)) {
-    GMP_DEBUG_PRINT("resouce acquire fail!");
-    return false;
+  int32_t display_path = DEFAULT_DISPLAY;
+  if (resourceRequestor_) {
+    display_path = resourceRequestor_->getDisplayPath();
+    if (display_path < DEFAULT_DISPLAY) {
+      GMP_INFO_PRINT("Error: Failed to get displayPath");
+      return false;
+    }
   }
-#endif
+
+  player_->SetDisplayPath(display_path);
 
   if (player_->Load(loadData)) {
-    GMP_DEBUG_PRINT("Loaded Bufferplayer");
+    GMP_DEBUG_PRINT("Loaded Player");
   } else {
     GMP_DEBUG_PRINT("Failed to load player");
     return false;
   }
 
+  isLoaded_ = true;
+  return true;
+}
+
+// Managed case
+bool MediaPlayerClient::Load(const std::string &str) {
+  GMP_DEBUG_PRINT("Load loadData = %s", str.c_str());
+  player_ = gmp::pf::PlayerFactory::CreatePlayer(str, playerType_);
+
+  if (!player_) {
+    GMP_INFO_PRINT("Error: Player not created");
+    return false;
+  }
+
+  LoadCommon();
+
+  if (player_->Load(str)) {
+    GMP_DEBUG_PRINT("Loaded Player");
+  } else {
+    GMP_DEBUG_PRINT("Failed to load player");
+    return false;
+  }
+
+  isLoaded_ = true;
+  return true;
+}
+
+bool MediaPlayerClient::Unload() {
+  GMP_DEBUG_PRINT("START");
+
+  if (!isLoaded_) {
+    GMP_DEBUG_PRINT("already unloaded");
+    return true;
+  }
+
+  if (!NotifyBackground())
+    GMP_DEBUG_PRINT("NotifyBackground fails");
+
+  if (!ReleaseResources())
+    GMP_DEBUG_PRINT("ReleaseResources fails");
+
+  if (!player_ || !player_->Unload())
+    GMP_DEBUG_PRINT("fails to unload the player");
+
+  isLoaded_ = false;
+  if (playerType_ == GMP_PLAYER_TYPE_BUFFER && resourceRequestor_)
+    resourceRequestor_->notifyPipelineStatus(uMediaServer::pipeline_state::UNLOADED);
+  GMP_DEBUG_PRINT("END");
+
   return true;
 }
 
 bool MediaPlayerClient::Play() {
-  GMP_DEBUG_PRINT("Play");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+  GMP_DEBUG_PRINT("");
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
     return false;
   }
-
   return player_->Play();
 }
 
 bool MediaPlayerClient::Pause() {
-  GMP_DEBUG_PRINT("Pause");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+  GMP_DEBUG_PRINT("");
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
     return false;
   }
-
   return player_->Pause();
 }
 
-bool MediaPlayerClient::Stop() {
-  GMP_INFO_PRINT("START");
-
-  if (isStopCalled_)
-    return true;
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
-
-  player_->NotifyBackground();
-  player_->ReleaseResources();
-
-  player_->Unload();
-
-  isStopCalled_ = true;
-  GMP_INFO_PRINT("END");
-  return true;
-}
-
 bool MediaPlayerClient::Seek(int position) {
-  GMP_DEBUG_PRINT("Seek");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+  GMP_DEBUG_PRINT("");
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
     return false;
   }
-
   return player_->Seek(position);
 }
 
 bool MediaPlayerClient::SetPlane(int planeId) {
-  GMP_DEBUG_PRINT("SetPlane");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
-
-  return player_->SetPlane(planeId);
+  GMP_DEBUG_PRINT("SetPlane is not Supported");
+  return true;
 }
 
 MEDIA_STATUS_T MediaPlayerClient::Feed(const guint8* pBuffer,
                                              guint32 bufferSize,
                                              guint64 pts,
                                              MEDIA_DATA_CHANNEL_T esData) {
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return MEDIA_ERROR;
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
+    return MEDIA_NOT_READY;
   }
-
   return player_->Feed(pBuffer, bufferSize, pts, esData);
 }
 
 bool MediaPlayerClient::Flush() {
-  GMP_DEBUG_PRINT("Flush");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+  GMP_DEBUG_PRINT("");
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
     return false;
   }
-
   return player_->Flush();
 }
 
@@ -157,14 +241,8 @@ bool MediaPlayerClient::SetDisplayWindow(const long left,
                                          const long width,
                                          const long height,
                                          const bool isFullScreen) {
-  GMP_DEBUG_PRINT("SetDisplayWindow");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
-
-  return player_->SetDisplayWindow(left, top, width, height, isFullScreen);
+  GMP_DEBUG_PRINT("Not supported. ignore this.");
+  return true;
 }
 
 bool MediaPlayerClient::SetCustomDisplayWindow(const long srcLeft,
@@ -176,80 +254,50 @@ bool MediaPlayerClient::SetCustomDisplayWindow(const long srcLeft,
                                                const long destWidth,
                                                const long destHeight,
                                                const bool isFullScreen) {
-  GMP_DEBUG_PRINT("SetCustomDisplayWindow");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
-
-  return player_->SetCustomDisplayWindow(srcLeft,
-                                         srcTop,
-                                         srcWidth,
-                                         srcHeight,
-                                         destLeft,
-                                         destTop,
-                                         destWidth,
-                                         destHeight,
-                                         isFullScreen);
-}
-
-bool MediaPlayerClient::RegisterCallback(
-    GMP_CALLBACK_FUNCTION_T cbFunction, void *userData) {
-  GMP_DEBUG_PRINT("RegisterCallback");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
-
-  player_->RegisterCbFunction(cbFunction, userData);
+  GMP_DEBUG_PRINT("Not supported. ignore this.");
   return true;
 }
 
 bool MediaPlayerClient::PushEndOfStream() {
-  GMP_DEBUG_PRINT("PushEndOfStream");
-
+  GMP_DEBUG_PRINT("");
   if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
     return false;
   }
-
   return player_->PushEndOfStream();
 }
 
-bool MediaPlayerClient ::NotifyForeground() {
-  GMP_DEBUG_PRINT("NotifyForeground");
+bool MediaPlayerClient::NotifyForeground() const {
+  GMP_DEBUG_PRINT("");
+  if (!resourceRequestor_)
+    return true;
 
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
-
-  return player_->NotifyForeground();
+  return resourceRequestor_->notifyForeground();
 }
 
-bool MediaPlayerClient::NotifyBackground() {
-  GMP_DEBUG_PRINT("NotifyBackground");
+bool MediaPlayerClient::NotifyBackground() const {
+  GMP_DEBUG_PRINT("");
+  if (!resourceRequestor_)
+    return true;
 
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
-    return false;
-  }
+  return resourceRequestor_->notifyBackground();
+}
 
-  return player_->NotifyBackground();
+bool MediaPlayerClient::NotifyActivity() const {
+  GMP_DEBUG_PRINT("");
+  if (!resourceRequestor_)
+    return true;
+
+  return resourceRequestor_->notifyActivity();
 }
 
 bool MediaPlayerClient::SetVolume(int volume) {
-  GMP_DEBUG_PRINT("SetVolume");
-
-  if (!player_) {
-    GMP_DEBUG_PRINT("Bufferplayer not created");
+  GMP_DEBUG_PRINT("");
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
     return false;
   }
-
-  player_->SetVolume(volume);
-  return true;
+  return player_->SetVolume(volume);
 }
 
 bool MediaPlayerClient::SetExternalContext(GMainContext *context) {
@@ -260,56 +308,77 @@ bool MediaPlayerClient::SetExternalContext(GMainContext *context) {
 
 bool MediaPlayerClient::SetPlaybackRate(const double playbackRate) {
   GMP_DEBUG_PRINT("playbackRate = %f", playbackRate);
-  if (player_)
-    return player_->SetPlayRate(playbackRate);
-  return false;
+  if (!player_ || !isLoaded_) {
+    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
+    return false;
+  }
+  return player_->SetPlayRate(playbackRate);
 }
 
 const char* MediaPlayerClient::GetMediaID() {
-  if (player_)
-    return player_->GetMediaID().c_str();
-  return NULL;
+  GMP_DEBUG_PRINT("");
+  if (!resourceRequestor_)
+    return nullptr;
+
+  return resourceRequestor_->getConnectionId().c_str();
 }
 
-base::source_info_t MediaPlayerClient::GetSourceInfo(
-    const MEDIA_LOAD_DATA_T* loadData) {
-  GMP_DEBUG_PRINT("loadData = %p", loadData);
+void MediaPlayerClient::NotifyFunction(const gint cbType, const gint64 numValue,
+  const gchar *strValue, void *udata) {
+  GMP_DEBUG_PRINT("type:%d, numValue:%" G_GINT64_FORMAT ", strValue:%p, udata:%p",
+    cbType, numValue, strValue, udata);
 
-  base::source_info_t source_info = {};
+  switch (cbType) {
+    case NOTIFY_LOAD_COMPLETED: {
+      if (playerType_ == GMP_PLAYER_TYPE_BUFFER && resourceRequestor_)
+        resourceRequestor_->notifyPipelineStatus(uMediaServer::pipeline_state::LOADED);
+      break;
+    }
+    case NOTIFY_PAUSED : {
+      if (playerType_ == GMP_PLAYER_TYPE_BUFFER && resourceRequestor_)
+        resourceRequestor_->notifyPipelineStatus(uMediaServer::pipeline_state::PAUSED);
+      break;
+    }
+    case NOTIFY_PLAYING : {
+      if (playerType_ == GMP_PLAYER_TYPE_BUFFER && resourceRequestor_)
+        resourceRequestor_->notifyPipelineStatus(uMediaServer::pipeline_state::PLAYING);
+      break;
+    }
+    case NOTIFY_ACTIVITY: {
+      NotifyActivity();
+      break;
+    }
+    case NOTIFY_ACQUIRE_RESOURCE: {
+      ACQUIRE_RESOURCE_INFO_T* info = static_cast<ACQUIRE_RESOURCE_INFO_T*>(udata);
+      if (pf::ElementFactory::GetPlatform().find("qemux86") == std::string::npos)
+        info->result = AcquireResources(*(info->sourceInfo), info->displayMode, numValue);
+      else
+        info->result = true;
+      break;
+    }
+    default: {
+      break;
+    }
+  }
 
-  base::video_info_t video_stream_info = {};
-  base::audio_info_t audio_stream_info = {};
-
-  video_stream_info.width = loadData->width;
-  video_stream_info.height = loadData->height;
-  video_stream_info.codec = loadData->videoCodec;
-  video_stream_info.frame_rate.num = loadData->frameRate;
-  video_stream_info.frame_rate.den = 1;
-
-  audio_stream_info.codec = loadData->audioCodec;
-  audio_stream_info.bit_rate = loadData->bitRate;
-  audio_stream_info.sample_rate = loadData->bitsPerSample;
-  audio_stream_info.channels = loadData->channels;
-
-  base::program_info_t program;
-  program.audio_stream = 1;
-  program.video_stream = 1;
-  source_info.programs.push_back(program);
-
-  source_info.video_streams.push_back(video_stream_info);
-  source_info.audio_streams.push_back(audio_stream_info);
-
-  source_info.seekable = true;
-
-  GMP_DEBUG_PRINT("[video info] width: %d, height: %d, frameRate: %d",
-                   video_stream_info.width,
-                   video_stream_info.height,
-                   video_stream_info.frame_rate.num /
-                       video_stream_info.frame_rate.den);
-
-  return source_info;
+  RunCallback(cbType, numValue, strValue, udata);
 }
 
+GstElement* MediaPlayerClient::GetPipeline()
+{
+  return player_ ? player_->GetPipeline() : NULL;
+}
+
+void MediaPlayerClient::RunCallback(const gint type, const gint64 numValue,
+  const gchar *strValue, void *udata) {
+  if (!userCallback_)
+    return;
+
+  if (userData_)
+    userCallback_(type, numValue, strValue, userData_);
+  else
+    userCallback_(type, numValue, strValue, udata);
+}
 }  // End of namespace player
 
 }  // End of namespace gmp

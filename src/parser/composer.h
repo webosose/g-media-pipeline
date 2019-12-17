@@ -46,6 +46,12 @@ pbnjson::JValue to_json(const base::error_t &);
 template<>
 pbnjson::JValue to_json(const base::buffer_range_t &);
 
+template<>
+pbnjson::JValue to_json(const base::media_info_t &);
+
+template<>
+pbnjson::JValue to_json(const base::load_param_t &);
+
 class Composer {
  public:
   Composer();
@@ -57,7 +63,12 @@ class Composer {
 
   template<typename T>
   void put(const std::string & key, const T & value) {
-    return put(key.c_str(), value);
+    put(key.c_str(), value);
+  }
+
+  template<typename T>
+  void put(const T & value) {
+    _dom = std::move(to_json(value));
   }
 
   std::string result();

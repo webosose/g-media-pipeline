@@ -112,6 +112,7 @@ class Parser {
 
   gint64 get_start_time(void) {
     gint64 start_time = 0;
+//    for(auto i = _dom.children().begin(); i != _dom.children().end(); ++i) {
     for(auto i : _dom.children()) {
       _serialized = pbnjson::JGenerator::serialize(i.second, true);
 

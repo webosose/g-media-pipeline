@@ -18,7 +18,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(g-media-pipeline)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 
 if(NOT DEFINED WEBOS_INSTALL_ROOT)
   set(WEBOS_INSTALL_ROOT /usr/local/webos/)
@@ -32,21 +32,6 @@ set(CMAKE_INSTALL_PREFIX ${WEBOS_INSTALL_ROOT}usr)
 
 if (NOT DEFINED ENV{PKG_CONFIG_PATH})
   set(ENV{PKG_CONFIG_PATH} ${WEBOS_INSTALL_ROOT}usr/share/pkgconfig)
-endif()
-
-if(${WEBOS_TARGET_MACHINE} STREQUAL "raspberrypi3" OR ${WEBOS_TARGET_MACHINE} STREQUAL "raspberrypi3-64")
-  message(STATUS "Build g-media-pipeline for raspberrypi3")
-  add_definitions(-DPLATFORM_RASPBERRYPI3)
-  add_definitions(-DMAX_NUM_DISPLAY=1)
-elseif (${WEBOS_TARGET_MACHINE} STREQUAL "raspberrypi4" OR ${WEBOS_TARGET_MACHINE} STREQUAL "raspberrypi4-64")
-  message(STATUS "Build g-media-pipeline for raspberrypi4")
-  add_definitions(-DPLATFORM_RASPBERRYPI4)
-  add_definitions(-DMAX_NUM_DISPLAY=1)
-elseif (${WEBOS_TARGET_MACHINE} STREQUAL "qemux86")
-  add_definitions(-DPLATFORM_QEMUX86)
-  add_definitions(-DMAX_NUM_DISPLAY=1)
-else()
-  message(FATAL_ERROR "Check WEBOS_TARGET_MACHINE: " ${WEBOS_TARGET_MACHINE})
 endif()
 
 file(GLOB_RECURSE HEADERS "*.h*")
@@ -65,3 +50,5 @@ link_directories(${GSTREAMER_LIBRARIES})
 
 add_subdirectory(src)
 add_subdirectory(files)
+add_subdirectory(test/uriplayer)
+add_subdirectory(test/bufferplayer)

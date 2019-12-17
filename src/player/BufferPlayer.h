@@ -8,106 +8,74 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-//
+
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef SRC_PLAYER_BUFFER_PLAYER_H_
 #define SRC_PLAYER_BUFFER_PLAYER_H_
 
-#include "Player.h"
+#include "AbstractPlayer.h"
 #include "PlayerTypes.h"
+#include "mediaplayerclient/MediaPlayerClient.h"
 
-#include "mediaresource/requestor.h"
-
-typedef struct {
-  GstElement *pSrcElement;
-  MEDIA_SRC_ELEM_IDX_T srcIdx;
-  guint bufferMinByte;
-  guint bufferMaxByte;
-  guint bufferMinPercent;
-} MEDIA_SRC_T;
-
-/* player status enum type */
-typedef enum {
-  LOADING_STATE,
-  STOPPED_STATE,
-  PAUSING_STATE,
-  PAUSED_STATE,
-  PLAYING_STATE,
-  PLAYED_STATE,
-} PIPELINE_STATE;
-
-namespace gmp { namespace base { struct error_t; }}
 namespace gmp { namespace base { struct source_info_t; }}
 
 namespace gmp {
 namespace player {
 
-class BufferPlayer : public Player {
+class BufferPlayer : public AbstractPlayer {
   public:
-    BufferPlayer(const std::string& appId);
     ~BufferPlayer();
 
-    bool Load(const std::string &uri) override;
-    bool Unload() override;
+    bool Load(const MEDIA_LOAD_DATA_T* loadData) override;
+    bool UnloadImpl() override;
     bool Play() override;
     bool Pause() override;
     bool SetPlayRate(const double rate) override;
     bool Seek(const int64_t position) override;
     bool SetVolume(int volume) override;
-    bool SetPlane(int planeId) override;
-    bool SetDisplayResource(gmp::base::disp_res_t &res) override;
-    void Initialize(gmp::service::IService* service) override;
 
-    bool AcquireResources(gmp::base::source_info_t &sourceInfo, uint32_t display_path = 0);
-    bool ReleaseResources();
-
-    bool Load(const MEDIA_LOAD_DATA_T* loadData);
-
-    void RegisterCbFunction(GMP_CALLBACK_FUNCTION_T cbFunction, void* udata);
-    bool PushEndOfStream();
-
-    bool Flush();
+    bool UpdateVideoResData(const gmp::base::source_info_t &sourceInfo) override;
+    bool PushEndOfStream() override;
+    bool Flush() override;
     MEDIA_STATUS_T Feed(const guint8* pBuffer, guint32 bufferSize,
-                        guint64 pts, MEDIA_DATA_CHANNEL_T esData);
-
-    bool NotifyForeground();
-    bool NotifyBackground();
-
-    bool SetDisplayWindow(const long left,
-                          const long top,
-                          const long width,
-                          const long height,
-                          const bool isFullScreen);
-    bool SetCustomDisplayWindow(const long srcLeft,
-                                const long srcTop,
-                                const long srcWidth,
-                                const long srcHeight,
-                                const long destLeft,
-                                const long destTop,
-                                const long destWidth,
-                                const long destHeight,
-                                const bool isFullScreen);
-
-    const std::string GetMediaID();
+                        guint64 pts, MEDIA_DATA_CHANNEL_T esData) override;
 
     static gboolean HandleBusMessage(GstBus* bus,
                                      GstMessage* message,
                                      gpointer user_data);
+    static GstBusSyncReply HandleSyncBusMessage(GstBus * bus,
+                                     GstMessage * msg, gpointer data);
 
     static gboolean NotifyCurrentTime(gpointer user_data);
+    bool SetSourceInfo(const gmp::base::source_info_t &sourceInfo);
 
-  private:
-    bool CreatePipeline();
+  protected:
+    BufferPlayer();
+    virtual bool CreatePipeline() = 0;
 
     bool AddSourceElements();
     bool AddParserElements();
     bool AddDecoderElements();
+    bool AddConverterElements();
     bool AddSinkElements();
-    void AddDecoderCapsProbe();
+    bool AddDumpElements();
+
+    bool AddAudioParserElement();
+    bool AddVideoParserElement();
+
+    bool AddAudioDecoderElement();
+    bool AddVideoDecoderElement();
+
+    bool AddAudioConverterElement();
+    bool AddVideoConverterElement();
+
+    bool AddAudioSinkElement();
+    bool AddVideoSinkElement();
 
     bool ConnectBusCallback();
     bool DisconnectBusCallback();
@@ -123,66 +91,68 @@ class BufferPlayer : public Player {
     void HandleBusStateMsg(GstMessage* pMessage);
     void HandleBusAsyncMsg();
     void HandleVideoInfoMsg(GstMessage* pMessage);
+    void HandleStreamStatsMsg(GstMessage* pMessage);
 
     bool UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData);
-    bool UpdateVideoResData(const gmp::base::source_info_t &sourceInfo);
 
     void NotifyVideoInfo();
+    bool NotifyActivity();
 
     static void EnoughData(GstElement* gstAppSrc, gpointer userData);
     static gboolean SeekData(GstElement* gstAppSrc, guint64 position,
                              gpointer userData);
 
-    void SetGstreamerDebug();
     void SetDecoderSpecificInfomation();
-    bool Finalize();
+
+    base::source_info_t GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);
+    void SetDebugDumpFileName();
 
     /*Pipeline elements*/
-    GstElement* videoPQueue_;
-    GstElement* videoParser_;
+    GstElement* videoPQueue_ = nullptr;
+    GstElement* videoParser_ = nullptr;
 
-    GstElement* audioPQueue_;
-    GstElement* audioParser_;
+    GstElement* audioPQueue_ = nullptr;
+    GstElement* audioParser_ = nullptr;
 
-    GstElement* videoDecoder_;
-    GstElement* videoConverter_;
-    GstElement* vSinkQueue_;
-    GstElement* videoSink_;
+    GstElement* videoDecoder_ = nullptr;
+    GstElement* videoPostProc_ = nullptr;
 
-    GstElement* audioDecoder_;
-    GstElement* audioConverter_;
-    GstElement* aSinkQueue_;
-    GstElement* audioSink_;
+    GstElement* vConverter_ = nullptr;
+    GstElement* videoQueue_ = nullptr;
+    GstElement* videoSink_ = nullptr;
 
-    GstBus * busHandler_;
-    gulong gSigBusAsync_;
+    GstElement* audioDecoder_ = nullptr;
+    GstElement* audioQueue_ = nullptr;
+    GstElement* audioConverter_ = nullptr;
+    GstElement* audioSink_ = nullptr;
+    GstElement* aResampler_ = nullptr;
+    GstElement* audioVolume_ = nullptr;
+    GstElement* audiofileDump_ = nullptr;
+    GstElement* videofileDump_ = nullptr;
 
-    int32_t planeId_;
-    int32_t crtcId_;
-    int32_t connId_;
-    bool planeIdSet_;
+    GstElement* linkElement_ = nullptr;
 
-    bool isUnloaded_;
-    bool recEndOfStream_;
-    bool feedPossible_;
+    GstBus * busHandler_ = nullptr;
+    gulong gSigBusAsync_ = 0;
 
-    guint currPosTimerId_;
-    guint64 currentPts_;
-    PIPELINE_STATE currentState_;
+    bool planeIdSet_ = false;
 
-    MEDIA_LOAD_DATA_T* loadData_;
-    void *userData_;
+    bool recEndOfStream_ = false;
+    bool feedPossible_ = false;
 
-    GMP_CALLBACK_FUNCTION_T notifyFunction_;
+    guint64 currentPts_ = 0;
+    PIPELINE_STATE currentState_ = STOPPED_STATE;
 
-    std::shared_ptr<gmp::resource::ResourceRequestor> resourceRequestor_;
+    MEDIA_LOAD_DATA_T* loadData_ = nullptr;
 
-    std::vector<MEDIA_SRC_T*> sourceInfo_;
+    std::vector<MEDIA_SRC_T*> sourceList_;
     CUSTOM_BUFFERING_STATE_T needFeedData_[IDX_MAX];
 
     guint64 totalFeed_[IDX_MAX];
 
     gmp::base::video_info_t videoInfo_;
+    gmp::base::source_info_t sourceInfo_;
+    gchar* inputDumpFileName = nullptr;
 };
 
 }  // namespace player

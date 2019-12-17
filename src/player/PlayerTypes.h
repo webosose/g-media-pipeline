@@ -17,10 +17,12 @@
 #ifndef SRC_PLAYER_PLAYERTYPES_H_
 #define SRC_PLAYER_PLAYERTYPES_H_
 
+#include <gst/gst.h>
+#include <functional>
 #include "types.h"
 
-typedef void (*GMP_CALLBACK_FUNCTION_T)(const gint type, const gint64 numValue, const gchar *strValue, void *udata);
-typedef void (*GMP_EVENT_CALLBACK_T)(int type, int64_t num, const char *str, void *data);
+using CALLBACK_T = std::function<void(const gint type, const gint64 numValue,
+    const gchar *strValue, void *udata)>;
 
 typedef enum {
   NOTIFY_LOAD_COMPLETED = 0,
@@ -42,8 +44,17 @@ typedef enum {
   NOTIFY_BUFFER_RANGE,
   NOTIFY_BUFFERING_START,
   NOTIFY_BUFFERING_END,
+  NOTIFY_ACTIVITY,
+  NOTIFY_ACQUIRE_RESOURCE,
   NOTIFY_MAX
 } NOTIFY_TYPE_T;
+
+typedef enum {
+  GMP_PLAYER_TYPE_URI = 0,
+  GMP_PLAYER_TYPE_BUFFER,
+  GMP_PLAYER_TYPE_EXT,
+  GMP_PLAYER_TYPE_HDMI
+} GMP_PLAYER_TYPE;
 
 typedef enum {
   GMP_ERROR_NONE,
@@ -59,6 +70,69 @@ typedef enum {
   CUSTOM_BUFFER_FULL,
   CUSTOM_BUFFER_LOCKED,
 } CUSTOM_BUFFERING_STATE_T;
+
+/**
+ * video codec
+ */
+typedef enum {
+  GMP_VIDEO_CODEC_NONE,
+  GMP_VIDEO_CODEC_H264,
+  GMP_VIDEO_CODEC_VC1,
+  GMP_VIDEO_CODEC_MPEG2,
+  GMP_VIDEO_CODEC_MPEG4,
+  GMP_VIDEO_CODEC_THEORA,
+  GMP_VIDEO_CODEC_VP8,
+  GMP_VIDEO_CODEC_VP9,
+  GMP_VIDEO_CODEC_H265,
+  GMP_VIDEO_CODEC_MJPEG,
+  GMP_VIDEO_CODEC_MAX = GMP_VIDEO_CODEC_MJPEG,
+} GMP_VIDEO_CODEC;
+
+/**
+ * audio codec
+ */
+typedef enum {
+  GMP_AUDIO_CODEC_NONE,
+  GMP_AUDIO_CODEC_AAC,
+  GMP_AUDIO_CODEC_MP3,
+  GMP_AUDIO_CODEC_PCM,
+  GMP_AUDIO_CODEC_VORBIS,
+  GMP_AUDIO_CODEC_FLAC,
+  GMP_AUDIO_CODEC_AMR_NB,
+  GMP_AUDIO_CODEC_AMR_WB,
+  GMP_AUDIO_CODEC_PCM_MULAW,
+  GMP_AUDIO_CODEC_GSM_MS,
+  GMP_AUDIO_CODEC_PCM_S16BE,
+  GMP_AUDIO_CODEC_PCM_S24BE,
+  GMP_AUDIO_CODEC_OPUS,
+  GMP_AUDIO_CODEC_EAC3,
+  GMP_AUDIO_CODEC_PCM_ALAW,
+  GMP_AUDIO_CODEC_ALAC,
+  GMP_AUDIO_CODEC_AC3,
+  GMP_AUDIO_CODEC_DTS,
+  GMP_AUDIO_CODEC_MAX = GMP_AUDIO_CODEC_DTS,
+} GMP_AUDIO_CODEC;
+
+/**
+ * drm type
+ */
+typedef enum {
+  DRM_UNKNOWN = 0,
+  DRM_PLAYREADY,
+  DRM_WIDEVINE_MODULAR,
+  DRM_TYPE_MAX
+} MEDIA_DRM_TYPE_T;
+
+/**
+ * HDMI input port number type
+ */
+typedef enum {
+  PORT_MIN = 0,
+  PORT_1,
+  PORT_2,
+  PORT_MAX
+} HDMI_PORT_NUM_T;
+
 
 /**
  * Load data structure for Buffer Player
@@ -81,6 +155,8 @@ typedef struct MEDIA_LOAD_DATA {
   void*   extraData;
   guint32 extraSize;
   guint32 displayPath;  /* to support multi display, 0(default) for primary, 1 for secondary display */
+  char*   windowId;     /* For GAV support */
+
   /* config for audio */
   guint32 channels;
   guint32 sampleRate;
@@ -91,14 +167,17 @@ typedef struct MEDIA_LOAD_DATA {
   guint32 audioObjectType;
   guint8* codecData;
   guint32 codecDataSize;
+  MEDIA_DRM_TYPE_T drmType;
+  guint32 svpVersion;
 
   public:
     MEDIA_LOAD_DATA() : maxWidth(0), maxHeight(0), maxFrameRate(0),
                         videoCodec(GMP_VIDEO_CODEC_NONE), audioCodec(GMP_AUDIO_CODEC_NONE),
                         ptsToDecode(0), frameRate(0), width(0), height(0), extraData(NULL),
-                        extraSize(0), displayPath(0), channels(0), sampleRate(0),
+                        extraSize(0), displayPath(0), windowId(NULL), channels(0), sampleRate(0),
                         blockAlign(0), bitRate(0), bitsPerSample(0), format(NULL),
-                        audioObjectType(0), codecData(NULL), codecDataSize(0) {
+                        audioObjectType(0), codecData(NULL), codecDataSize(0),
+                        drmType(DRM_UNKNOWN), svpVersion(0) {
     }
     MEDIA_LOAD_DATA(guint32 maxWidth_, guint32 maxHeight_, guint32 maxFrameRate_,
                     GMP_VIDEO_CODEC videoCodec_, GMP_AUDIO_CODEC audioCodec_,
@@ -108,6 +187,9 @@ typedef struct MEDIA_LOAD_DATA {
                     guint32 bitRate_, guint32 bitsPerSample_,
                     gchar* format_, guint32 audioObjectType_,
                     guint8* codecData_, guint32 codecdataSize_) {
+
+      // TODO: add drmType, svpVersion
+
       maxWidth = maxWidth_;
       maxHeight = maxHeight_;
       maxFrameRate = maxFrameRate_;
@@ -129,6 +211,7 @@ typedef struct MEDIA_LOAD_DATA {
       audioObjectType = audioObjectType_;
       codecData = codecData_;
       codecDataSize = codecdataSize_;
+      windowId = NULL;
     }
 } MEDIA_LOAD_DATA_T;
 
@@ -227,5 +310,41 @@ typedef enum {
   MEDIA_INVALID_PARAMS = -3,                      /**< Invalid parameters */
   MEDIA_NOT_READY = -11,                          /**< API's resource is not ready */
 } MEDIA_STATUS_T;
+
+typedef enum {
+  DEFAULT_DISPLAY = 0,
+  PRIMARY_DISPLAY = 0,
+  SECONDARY_DISPLAY,
+} DISPLAY_PATH;
+
+typedef enum {
+  PLAYBIN_PIPELINE = 0,
+  CUSTOM_PLAYER_PIPELINE,
+  HDMI_PIPELINE
+} PIPELINE_TYPE;
+
+typedef struct {
+  GstElement *pSrcElement;
+  MEDIA_SRC_ELEM_IDX_T srcIdx;
+  guint bufferMinByte;
+  guint bufferMaxByte;
+  guint bufferMinPercent;
+} MEDIA_SRC_T;
+
+/* player status enum type */
+typedef enum {
+  LOADING_STATE,
+  STOPPED_STATE,
+  PAUSING_STATE,
+  PAUSED_STATE,
+  PLAYING_STATE,
+  PLAYED_STATE,
+} PIPELINE_STATE;
+
+typedef struct ACQUIRE_RESOURCE_INFO {
+  gmp::base::source_info_t* sourceInfo;
+  char *displayMode;
+  gboolean result;
+} ACQUIRE_RESOURCE_INFO_T;
 
 #endif  // SRC_PLAYER_PLAYERTYPES_H_
