@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019 LG Electronics, Inc.
+# Copyright (c) 2018-2020 LG Electronics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,32 +44,17 @@ include_directories(src)
 set(SRC_LIST
     ../log/log.cpp
     src/lsm_connector.cpp
+    src/wayland_exporter.cpp
     src/wayland_foreign.cpp
     src/wayland_importer.cpp
     src/wayland_surface.cpp
 )
-
-set(LSM_CONNECTOR_VERSION_MAJOR 1)
-set(LSM_CONNECTOR_VERSION_MINOR 0)
-set(LSM_CONNECTOR_VERSION_PATCH 0)
-set(LSM_CONNECTOR_VERSION_LIST
-    "${LSM_CONNECTOR_VERSION_MAJOR}"
-    ".${LSM_CONNECTOR_VERSION_MINOR}"
-    ".${LSM_CONNECTOR_VERSION_PATCH}"
-    )
-string(REPLACE ";" "" LSM_CONNECTOR_VERSION
-    ${LSM_CONNECTOR_VERSION_LIST})
-
 
 add_library(${LSM_CONNECTOR_LIB} SHARED ${SRC_LIST})
 target_link_libraries(${LSM_CONNECTOR_LIB}
     ${PMLOG_LIBRARIES}
     ${WAYLAND_CLIENT_LDFLAGS}
     ${WAYLAND_WEBOS_CLIENT_LDFLAGS})
-
-set_target_properties(${LSM_CONNECTOR_LIB} PROPERTIES
-    VERSION ${LSM_CONNECTOR_VERSION}
-    SOVERSION ${LSM_CONNECTOR_VERSION_MAJOR})
 
 install(TARGETS ${LSM_CONNECTOR_LIB} DESTINATION lib)
 
