@@ -159,7 +159,9 @@ void Service::Notify(const gint notification, const gint64 numValue, const gchar
       break;
     }
   }
-  umc_->sendChangeNotificationJsonString(composer.result());
+  std::string payload_str = composer.result();
+  GMP_DEBUG_PRINT(" payload_str = %s", payload_str.c_str());
+  umc_->sendChangeNotificationJsonString(payload_str);
 }
 
 bool Service::Wait() {

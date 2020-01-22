@@ -730,19 +730,14 @@ base::buffer_range_t UriPlayer::CalculateBufferingTime() {
     // percent means percentage of buffered data. This is a value between 0 and 100.
     // The is_buffering indicator is TRUE when the buffering is in progress.
     gst_query_parse_buffering_percent(query, &is_buffering, &percent);
-    GMP_DEBUG_PRINT("is_buffering[%d] percent[%d]", is_buffering, percent);
 
     // amount of buffering time left in milliseconds.
     gst_query_parse_buffering_stats(query, NULL, NULL, NULL, &buffering_left);
-    GMP_DEBUG_PRINT("buffering_left[%" G_GINT64_FORMAT " ms] -> [%" G_GINT64_FORMAT " sec]",
-            buffering_left, buffering_left / 1000);
 
     position = GST_TIME_AS_MSECONDS(current_position_);
     duration = GST_TIME_AS_MSECONDS(duration_);
 
     buffering_time = queue2MaxSizeMsec - buffering_left + position;
-    GMP_DEBUG_PRINT("preBuffered_time[%" G_GINT64_FORMAT " ms] buffering_time[%" G_GINT64_FORMAT " ms]",
-            buffered_time_, buffering_time);
 
     // sometimes buffering_time is reduced during buffering.
     // so we need to update maximum buffering time.
