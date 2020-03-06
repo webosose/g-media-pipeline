@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -8,11 +8,10 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
-// implied.
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+//
 // SPDX-License-Identifier: Apache-2.0
 
 #ifndef SRC_PLAYER_BUFFER_PLAYER_H_
@@ -52,30 +51,35 @@ class BufferPlayer : public AbstractPlayer {
                                      GstMessage * msg, gpointer data);
 
     static gboolean NotifyCurrentTime(gpointer user_data);
-    bool SetSourceInfo(const gmp::base::source_info_t &sourceInfo);
 
   protected:
     BufferPlayer();
-    virtual bool CreatePipeline() = 0;
+    virtual bool CreatePipeline();
 
-    bool AddSourceElements();
-    bool AddParserElements();
-    bool AddDecoderElements();
-    bool AddConverterElements();
-    bool AddSinkElements();
-    bool AddDumpElements();
+    bool AddAudioPipelineElements();
+    bool AddVideoPipelineElements();
 
+    /* for audio */
+    bool AddAudioSourceElement();
     bool AddAudioParserElement();
-    bool AddVideoParserElement();
-
     bool AddAudioDecoderElement();
-    bool AddVideoDecoderElement();
-
     bool AddAudioConverterElement();
-    bool AddVideoConverterElement();
-
     bool AddAudioSinkElement();
+
+    /* for video */
+    bool AddVideoSourceElement();
+    bool AddVideoParserElement();
+    bool AddVideoDecoderElement();
+    bool AddVideoConverterElement();
     bool AddVideoSinkElement();
+
+    void FreePipelineElements();
+
+    bool AddAndLinkElement(GstElement * target_element);
+
+    /* for debugging */
+    bool AddAudioDumpElement();
+    bool AddVideoDumpElement();
 
     bool ConnectBusCallback();
     bool DisconnectBusCallback();
@@ -83,10 +87,8 @@ class BufferPlayer : public AbstractPlayer {
     bool PauseInternal();
     bool SeekInternal(const int64_t msecond);
 
-    void SetAppSrcBufferLevel(MEDIA_SRC_ELEM_IDX_T srcIdx,
-                              MEDIA_SRC_T* pSrcInfo);
-    bool IsBufferAvailable(MEDIA_SRC_ELEM_IDX_T srcIdx, guint64 newBufferSize);
-    bool IsFeedPossible(MEDIA_SRC_ELEM_IDX_T chIdx, guint64 bufferSize);
+    bool IsBufferAvailable(MEDIA_SRC_T* pAppSrcInfo, guint64 newBufferSize);
+    bool IsFeedPossible(MEDIA_SRC_T* pAppSrcInfo, guint64 bufferSize);
 
     void HandleBusStateMsg(GstMessage* pMessage);
     void HandleBusAsyncMsg();
@@ -105,22 +107,27 @@ class BufferPlayer : public AbstractPlayer {
     void SetDecoderSpecificInfomation();
 
     base::source_info_t GetSourceInfo(const MEDIA_LOAD_DATA_T* loadData);
+    void SetAppSrcProperties(MEDIA_SRC_T* pAppSrcInfo, guint64 bufferMaxLevel);
     void SetDebugDumpFileName();
 
-    /*Pipeline elements*/
+    /* for debugging */
+    void PrintLoadData(const MEDIA_LOAD_DATA_T* loadData);
+
+    /*Video Pipeline elements*/
+    std::shared_ptr<MEDIA_SRC_T> videoSrcInfo_ = nullptr;
     GstElement* videoPQueue_ = nullptr;
     GstElement* videoParser_ = nullptr;
-
-    GstElement* audioPQueue_ = nullptr;
-    GstElement* audioParser_ = nullptr;
-
     GstElement* videoDecoder_ = nullptr;
     GstElement* videoPostProc_ = nullptr;
-
-    GstElement* vConverter_ = nullptr;
     GstElement* videoQueue_ = nullptr;
+    GstElement* vConverter_ = nullptr;
     GstElement* videoSink_ = nullptr;
+    GstElement* videofileDump_ = nullptr;
 
+    /*Audio Pipeline elements*/
+    std::shared_ptr<MEDIA_SRC_T> audioSrcInfo_ = nullptr;
+    GstElement* audioPQueue_ = nullptr;
+    GstElement* audioParser_ = nullptr;
     GstElement* audioDecoder_ = nullptr;
     GstElement* audioQueue_ = nullptr;
     GstElement* audioConverter_ = nullptr;
@@ -128,9 +135,8 @@ class BufferPlayer : public AbstractPlayer {
     GstElement* aResampler_ = nullptr;
     GstElement* audioVolume_ = nullptr;
     GstElement* audiofileDump_ = nullptr;
-    GstElement* videofileDump_ = nullptr;
 
-    GstElement* linkElement_ = nullptr;
+    GstElement* linkedElement_ = nullptr;
 
     GstBus * busHandler_ = nullptr;
     gulong gSigBusAsync_ = 0;
@@ -143,12 +149,7 @@ class BufferPlayer : public AbstractPlayer {
     guint64 currentPts_ = 0;
     PIPELINE_STATE currentState_ = STOPPED_STATE;
 
-    MEDIA_LOAD_DATA_T* loadData_ = nullptr;
-
-    std::vector<MEDIA_SRC_T*> sourceList_;
-    CUSTOM_BUFFERING_STATE_T needFeedData_[IDX_MAX];
-
-    guint64 totalFeed_[IDX_MAX];
+    std::shared_ptr<MEDIA_LOAD_DATA_T> loadData_ = nullptr;
 
     gmp::base::video_info_t videoInfo_;
     gmp::base::source_info_t sourceInfo_;

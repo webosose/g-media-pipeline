@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,13 +27,12 @@ pbnjson::JValue to_json(const base::result_t & result) {
 
 template<>
 pbnjson::JValue to_json(const base::video_info_t & info) {
-  return pbnjson::JObject {{"video",
-      pbnjson::JObject{{"codec", info.codec},
+  return pbnjson::JObject{{"codec", info.codec},
                        {"bitrate", (int64_t)info.bit_rate},
                        {"width", (int32_t)info.width},
                        {"height", (int32_t)info.height},
                        {"frame_rate", pbnjson::JObject {{"num", info.frame_rate.num},
-                                                        {"den", info.frame_rate.den}}}}}};
+                                                        {"den", info.frame_rate.den}}}};
 }
 
 template<>

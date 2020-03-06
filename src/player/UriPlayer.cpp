@@ -331,7 +331,7 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
                                      GstMessage *message, gpointer user_data) {
   GstMessageType messageType = GST_MESSAGE_TYPE(message);
   if (messageType != GST_MESSAGE_QOS && messageType != GST_MESSAGE_TAG) {
-    GMP_INFO_PRINT("Element[ %s ][ %d ][ %s ]", GST_MESSAGE_SRC_NAME(message),
+    GMP_DEBUG_PRINT("Element[ %s ][ %d ][ %s ]", GST_MESSAGE_SRC_NAME(message),
                     messageType, gst_message_type_get_name(messageType));
   }
 
@@ -395,7 +395,7 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       GstState old_state, new_state;
       gst_message_parse_state_changed(message, &old_state, &new_state, NULL);
 
-      GMP_INFO_PRINT("Element [ %s ] State changed ...%s -> %s",
+      GMP_DEBUG_PRINT("Element [ %s ] State changed ...%s -> %s",
                 GST_MESSAGE_SRC_NAME(message),
                 gst_element_state_get_name(old_state),
                 gst_element_state_get_name(new_state));

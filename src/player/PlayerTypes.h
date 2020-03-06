@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -114,6 +114,27 @@ typedef enum {
 } GMP_AUDIO_CODEC;
 
 /**
+ * sample format type
+ */
+typedef enum {
+  GMP_AUDIO_FORMAT_UNKNOWN,
+  GMP_AUDIO_FORMAT_ENCODED,
+  GMP_AUDIO_FORMAT_S8,
+  GMP_AUDIO_FORMAT_U8,
+  GMP_AUDIO_FORMAT_S16LE,
+  GMP_AUDIO_FORMAT_S16BE,
+  GMP_AUDIO_FORMAT_U16LE,
+  GMP_AUDIO_FORMAT_U16BE,
+  GMP_AUDIO_FORMAT_S24_32LE,
+  GMP_AUDIO_FORMAT_S24_32BE,
+  GMP_AUDIO_FORMAT_U24_32LE,
+  GMP_AUDIO_FORMAT_U24_32BE,
+  GMP_AUDIO_FORMAT_S32LE,
+  GMP_AUDIO_FORMAT_S32BE,
+  GMP_AUDIO_FORMAT_MAX = GMP_AUDIO_FORMAT_S32BE,
+} GMP_AUDIO_SAMPLE_FORMAT;
+
+/**
  * drm type
  */
 typedef enum {
@@ -169,6 +190,8 @@ typedef struct MEDIA_LOAD_DATA {
   guint32 codecDataSize;
   MEDIA_DRM_TYPE_T drmType;
   guint32 svpVersion;
+  GMP_AUDIO_SAMPLE_FORMAT sampleFormat;
+  gboolean liveStream;
 
   public:
     MEDIA_LOAD_DATA() : maxWidth(0), maxHeight(0), maxFrameRate(0),
@@ -177,7 +200,8 @@ typedef struct MEDIA_LOAD_DATA {
                         extraSize(0), displayPath(0), windowId(NULL), channels(0), sampleRate(0),
                         blockAlign(0), bitRate(0), bitsPerSample(0), format(NULL),
                         audioObjectType(0), codecData(NULL), codecDataSize(0),
-                        drmType(DRM_UNKNOWN), svpVersion(0) {
+                        drmType(DRM_UNKNOWN), svpVersion(0), liveStream(false),
+                        sampleFormat(GMP_AUDIO_FORMAT_UNKNOWN) {
     }
     MEDIA_LOAD_DATA(guint32 maxWidth_, guint32 maxHeight_, guint32 maxFrameRate_,
                     GMP_VIDEO_CODEC videoCodec_, GMP_AUDIO_CODEC audioCodec_,
@@ -186,7 +210,10 @@ typedef struct MEDIA_LOAD_DATA {
                     guint32 channels_, guint32 sampleRate_, guint32 blockAligh_,
                     guint32 bitRate_, guint32 bitsPerSample_,
                     gchar* format_, guint32 audioObjectType_,
-                    guint8* codecData_, guint32 codecdataSize_) {
+                    guint8* codecData_, guint32 codecdataSize_,
+                    MEDIA_DRM_TYPE_T drmType_ = DRM_UNKNOWN, guint32 svpVersion_ = 0,
+                    gboolean liveStream_ = false,
+                    GMP_AUDIO_SAMPLE_FORMAT sampleFormat_ = GMP_AUDIO_FORMAT_UNKNOWN) {
 
       // TODO: add drmType, svpVersion
 
@@ -212,6 +239,10 @@ typedef struct MEDIA_LOAD_DATA {
       codecData = codecData_;
       codecDataSize = codecdataSize_;
       windowId = NULL;
+      drmType = drmType_;
+      svpVersion = svpVersion_;
+      liveStream = liveStream_;
+      sampleFormat = sampleFormat_;
     }
 } MEDIA_LOAD_DATA_T;
 
@@ -325,10 +356,11 @@ typedef enum {
 
 typedef struct {
   GstElement *pSrcElement;
-  MEDIA_SRC_ELEM_IDX_T srcIdx;
-  guint bufferMinByte;
   guint bufferMaxByte;
   guint bufferMinPercent;
+  std::string elementName;
+  CUSTOM_BUFFERING_STATE_T needFeedData;
+  guint64 totalFeed;
 } MEDIA_SRC_T;
 
 /* player status enum type */

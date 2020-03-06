@@ -1,13 +1,18 @@
-// @@@LICENSE
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
-// Copyright (C) 2018-2020, LG Electronics, All Right Reserved.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-// No part of this source code may be communicated, distributed, reproduced
-// or transmitted in any form or by any means, electronic or mechanical or
-// otherwise, for any purpose, without the prior written permission of
-// LG Electronics.
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// LICENSE@@@
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// SPDX-License-Identifier: Apache-2.0
 
 
 #include "BufferPlayer.h"
@@ -74,31 +79,23 @@ namespace player {
 
 BufferPlayer::BufferPlayer() {
   GMP_INFO_PRINT("START");
+
   SetDebugDumpFileName();
-  memset(&totalFeed_, 0x00, (sizeof(guint64)*IDX_MAX));
-  memset(&needFeedData_, 0x00, (sizeof(CUSTOM_BUFFERING_STATE_T)*IDX_MAX));
 
   GMP_INFO_PRINT("END");
 }
 
 BufferPlayer::~BufferPlayer() {
   Unload();
-
-  GMP_INFO_PRINT("loadData_ = %p", loadData_);
-  if (loadData_) {
-    delete loadData_;
-    loadData_ = nullptr;
-  }
 }
 
 bool BufferPlayer::UnloadImpl() {
   GMP_INFO_PRINT("START");
 
-  for (auto mediaSrc : sourceList_) {
-    if (mediaSrc)
-      delete mediaSrc;
-  }
-  sourceList_.clear();
+  audioSrcInfo_.reset();
+  videoSrcInfo_.reset();
+
+  loadData_.reset();
 
   DisconnectBusCallback();
 
@@ -140,8 +137,7 @@ bool BufferPlayer::Play() {
     }
 
     if (cbFunction_) {
-      cbFunction_(NOTIFY_ACTIVITY,
-          0, nullptr, nullptr);
+      cbFunction_(NOTIFY_ACTIVITY, 0, nullptr, nullptr);
     }
   }
 
@@ -165,8 +161,7 @@ bool BufferPlayer::Pause() {
       return false;
 
     if (cbFunction_) {
-      cbFunction_(NOTIFY_ACTIVITY,
-          0, nullptr, nullptr);
+      cbFunction_(NOTIFY_ACTIVITY, 0, nullptr, nullptr);
     }
 
   }
@@ -264,7 +259,7 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
     return false;
 
   window_id_ = loadData->windowId ? loadData->windowId : "";
-
+  GMP_INFO_PRINT("window_id_(%s)", window_id_.c_str());
   display_mode_ = "Textured";
 
   source_info_ = GetSourceInfo(loadData);
@@ -275,7 +270,8 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
   resource_info.result = false;
 
   if (cbFunction_)
-    cbFunction_(NOTIFY_ACQUIRE_RESOURCE, display_path_, nullptr, static_cast<void*>(&resource_info));
+    cbFunction_(NOTIFY_ACQUIRE_RESOURCE, display_path_, nullptr,
+                static_cast<void*>(&resource_info));
 
   if (!resource_info.result) {
     GMP_DEBUG_PRINT("resouce acquire fail!");
@@ -291,6 +287,23 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
     GMP_DEBUG_PRINT("CreatePipeline Failed");
     return false;
   }
+
+  if (!PauseInternal()) {
+    GMP_INFO_PRINT("Failed to pause !!!");
+    return false;
+  }
+
+  currentState_ = LOADING_STATE;
+
+  if (loadData_->liveStream) {
+    // appsrc element can't produce data in GST_STATE_PAUSED in live case.
+    gst_element_set_state(pipeline_, GST_STATE_PLAYING);
+    currentState_ = PLAYING_STATE;
+    if (cbFunction_)
+      cbFunction_(NOTIFY_PLAYING, 0, nullptr, nullptr);
+  }
+
+  GMP_INFO_PRINT("END currentState_ = %d", currentState_);
 
   if (loadData_->ptsToDecode > 0) {
     // By calling seek with ptsToDecode, we handle ReInitialize in seek.
@@ -315,14 +328,26 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
 bool BufferPlayer::PushEndOfStream() {
   GMP_DEBUG_PRINT("PushEndOfStream");
 
-  recEndOfStream_ = true;
-  for (int index = 0; index < sourceList_.size(); index++) {
-    GstElement* pSrcElement = sourceList_[index]->pSrcElement;
-    if (pSrcElement) {
-      if (GST_FLOW_OK != gst_app_src_end_of_stream(GST_APP_SRC(pSrcElement)))
-        return false;
-    }
+  if (loadData_->liveStream) {
+    GMP_INFO_PRINT("liveStream . So Skip sending EOS to appsrc, \
+                   because we may replay media again.");
+    return true;
   }
+
+  recEndOfStream_ = true;
+
+  if (audioSrcInfo_ && audioSrcInfo_->pSrcElement) {
+    if (GST_FLOW_OK != gst_app_src_end_of_stream(
+            GST_APP_SRC(audioSrcInfo_->pSrcElement)))
+      return false;
+  }
+
+  if (videoSrcInfo_ && videoSrcInfo_->pSrcElement) {
+    if (GST_FLOW_OK != gst_app_src_end_of_stream(
+            GST_APP_SRC(videoSrcInfo_->pSrcElement)))
+      return false;
+  }
+
   return true;
 }
 
@@ -335,11 +360,15 @@ bool BufferPlayer::Flush() {
     return false;
   }
 
-  // init values regarding with feeding
-  memset(&totalFeed_, 0x00, (sizeof(guint64)*IDX_MAX));
+  if (videoSrcInfo_) {
+    videoSrcInfo_->totalFeed = 0;
+    videoSrcInfo_->needFeedData = CUSTOM_BUFFER_LOCKED;
+  }
 
-  needFeedData_[IDX_VIDEO] = CUSTOM_BUFFER_LOCKED;
-  needFeedData_[IDX_AUDIO] = CUSTOM_BUFFER_LOCKED;
+  if (audioSrcInfo_) {
+    audioSrcInfo_->totalFeed = 0;
+    audioSrcInfo_->needFeedData = CUSTOM_BUFFER_LOCKED;
+  }
 
   recEndOfStream_ = false;
 
@@ -369,16 +398,27 @@ MEDIA_STATUS_T BufferPlayer::Feed(const guint8* pBuffer,
     return MEDIA_ERROR;
   }
 
-  MEDIA_SRC_ELEM_IDX_T srcIdx = IDX_MULTI;
-  if (esData == MEDIA_DATA_CH_A)
-    srcIdx = IDX_VIDEO;
-  else if (esData == MEDIA_DATA_CH_B)
-    srcIdx = IDX_AUDIO;
-
-  if (!sourceList_[srcIdx]->pSrcElement || bufferSize == 0)
+  MEDIA_SRC_T* pAppSrcInfo = nullptr;
+  if (esData == MEDIA_DATA_CH_A) {
+    pAppSrcInfo = videoSrcInfo_.get();
+  } else if (esData == MEDIA_DATA_CH_B) {
+    pAppSrcInfo = audioSrcInfo_.get();
+  } else {
+    GMP_INFO_PRINT("Wrong media channel type !!!");
     return MEDIA_ERROR;
+  }
 
-  if (!IsFeedPossible(srcIdx, bufferSize)) {
+  if (!pAppSrcInfo) {
+    GMP_INFO_PRINT("App SRC not found !!!");
+    return MEDIA_ERROR;
+  }
+
+  if (!pAppSrcInfo->pSrcElement || bufferSize == 0) {
+    GMP_INFO_PRINT("Possible bufferSize (%d) is Zeror!!!", bufferSize);
+    return MEDIA_ERROR;
+  }
+
+  if (!IsFeedPossible(pAppSrcInfo, bufferSize)) {
      GMP_INFO_PRINT("Feed is not Possible!!!");
      return MEDIA_BUFFER_FULL;
   }
@@ -408,13 +448,13 @@ MEDIA_STATUS_T BufferPlayer::Feed(const guint8* pBuffer,
   }
 
   GstFlowReturn gstReturn = gst_app_src_push_buffer(
-      GST_APP_SRC(sourceList_[srcIdx]->pSrcElement), appSrcBuffer);
+      GST_APP_SRC(pAppSrcInfo->pSrcElement), appSrcBuffer);
   if (gstReturn < GST_FLOW_OK) {
     GMP_INFO_PRINT("gst_app_src_push_buffer errCode[ %d ]", gstReturn);
     return MEDIA_ERROR;
   }
 
-  totalFeed_[srcIdx] += bufferSize;  // audio or video
+  pAppSrcInfo->totalFeed += bufferSize;  // audio or video
 
   return MEDIA_OK;
 }
@@ -470,8 +510,7 @@ gboolean BufferPlayer::HandleBusMessage(
     case GST_MESSAGE_EOS: {
       GMP_INFO_PRINT(" GST_MESSAGE_EOS");
       if (player->cbFunction_) {
-        player->cbFunction_(NOTIFY_END_OF_STREAM,
-                                0, nullptr, nullptr);
+        player->cbFunction_(NOTIFY_END_OF_STREAM, 0, nullptr, nullptr);
       }
       break;
     }
@@ -609,8 +648,7 @@ gboolean BufferPlayer::NotifyCurrentTime(gpointer user_data) {
   if (player->cbFunction_ && player->currentPts_ != pos) {
     player->currentPts_ = pos;
     gint64 currentPtsInMs = (gint64)(pos / GST_MSECOND);
-    player->cbFunction_(NOTIFY_CURRENT_TIME,
-                            currentPtsInMs, nullptr, nullptr);
+    player->cbFunction_(NOTIFY_CURRENT_TIME, currentPtsInMs, nullptr, nullptr);
 
     gint64 inSecs = currentPtsInMs / 1000;
     gint hours = inSecs / 3600;
@@ -623,133 +661,117 @@ gboolean BufferPlayer::NotifyCurrentTime(gpointer user_data) {
   return true;
 }
 
-bool BufferPlayer::AddSourceElements() {
-  GMP_DEBUG_PRINT("Create and add audio/video source elements");
+bool BufferPlayer::CreatePipeline() {
+  GMP_INFO_PRINT("audioCodec [ %d ], videoCodec [ %d ]",
+                  loadData_->audioCodec, loadData_->videoCodec);
 
-  std::string srcElementName = "";
-  for (gint32 srcIdx = 0; srcIdx < MEDIA_CHANNEL_MAX; srcIdx++) {
-    MEDIA_SRC_T *pSrcInfo = new MEDIA_SRC_T();
-    pSrcInfo->bufferMinByte = 0;
-    pSrcInfo->bufferMaxByte = 0;
-    pSrcInfo->bufferMinPercent = 0;
+  pipeline_ = gst_pipeline_new("custom-player");
+  GMP_INFO_PRINT("pipeline_ = %p", pipeline_);
+  if (!pipeline_) {
+    GMP_INFO_PRINT("Cannot create custom player!");
+    return false;
+  }
 
-    pSrcInfo->srcIdx = static_cast<MEDIA_SRC_ELEM_IDX_T>(srcIdx);
-    if (srcIdx == IDX_VIDEO)
-      srcElementName = "video-app-es";
-    else if (srcIdx == IDX_AUDIO)
-      srcElementName = "audio-app-es";
+  ConnectBusCallback();
 
-    pSrcInfo->pSrcElement =
-        gst_element_factory_make("appsrc", srcElementName.c_str());
-    if (!pSrcInfo->pSrcElement) {
-      GMP_DEBUG_PRINT("appsrc(%d) element can not be created!!!", srcIdx);
+  if (loadData_->audioCodec != GMP_AUDIO_CODEC_NONE) {
+     if (!AddAudioPipelineElements()) {
+       GMP_INFO_PRINT("Failed to create Audio pipeline path !!!");
+       return false;
+     }
+  }
+
+  if (loadData_->videoCodec != GMP_VIDEO_CODEC_NONE) {
+    if (!AddVideoPipelineElements()) {
+      GMP_INFO_PRINT("Failed to create Video pipeline path !!!");
       return false;
     }
-    GMP_INFO_PRINT("pSrcInfo->pSrcElement = %p", pSrcInfo->pSrcElement);
-    gchar * srcReadName = NULL;
-    g_object_get(G_OBJECT(pSrcInfo->pSrcElement), "name", &srcReadName, NULL);
-
-    if (srcReadName) {
-      GMP_DEBUG_PRINT("=============srcIdx[ %d ],name[ %s ]==============",
-                       srcIdx, srcReadName);
-      g_free(srcReadName);
-    }
-
-    SetAppSrcBufferLevel(static_cast<MEDIA_SRC_ELEM_IDX_T>(srcIdx), pSrcInfo);
-
-    if (pSrcInfo->pSrcElement) {
-      gst_util_set_object_arg(G_OBJECT(pSrcInfo->pSrcElement),
-                              "stream-type", "seekable");
-
-      g_signal_connect(reinterpret_cast<GstAppSrc*>(pSrcInfo->pSrcElement),
-                       "enough-data", G_CALLBACK(EnoughData), this);
-      g_signal_connect(reinterpret_cast<GstAppSrc*>(pSrcInfo->pSrcElement),
-                       "seek-data", G_CALLBACK(SeekData), this);
-
-      gst_bin_add(GST_BIN(pipeline_), pSrcInfo->pSrcElement);
-
-      sourceList_.push_back(pSrcInfo);
-
-      guint64 maxBufferSize = 0;
-      g_object_get(G_OBJECT(pSrcInfo->pSrcElement),
-                   "max-bytes", &maxBufferSize, NULL);
-      GMP_DEBUG_PRINT("srcIdx[%d], maxBufferSize[%" G_GUINT64_FORMAT "]",
-        srcIdx, maxBufferSize);
-      GMP_DEBUG_PRINT("Audio/Video source elements are Added!!!");
-    }
-    else {
-      GMP_DEBUG_PRINT("ERROR : Audio/Video source elements Add failed!!!");
-    }
   }
-  return true;
-}
 
-bool BufferPlayer::AddParserElements() {
-  if (!AddAudioParserElement())
-    return false;
+  GMP_INFO_PRINT("Buffer player pipeline is created !!!");
 
-  if (!AddVideoParserElement())
-    return false;
+  SetDecoderSpecificInfomation();
 
   return true;
 }
 
-bool BufferPlayer::AddDecoderElements() {
-  if (!AddAudioDecoderElement())
-    return false;
+bool BufferPlayer::AddAudioPipelineElements() {
+  GMP_DEBUG_PRINT("Create and add elements for audio pipeline");
 
-  if (!AddVideoDecoderElement())
-    return false;
-
-  return true;
-}
-
-bool BufferPlayer::AddConverterElements() {
-  if (!AddAudioConverterElement())
-    return false;
-
-  if (!AddVideoConverterElement())
-    return false;
-
-  return true;
-}
-
-bool BufferPlayer::AddSinkElements() {
-  if (!AddAudioSinkElement())
-    return false;
-
-  if (!AddVideoSinkElement())
-    return false;
-
-  return true;
-}
-
-bool BufferPlayer::AddDumpElements() {
-  std::string dumpName("/tmp/");
-  dumpName.append(inputDumpFileName);
-  videofileDump_= gst_element_factory_make("filesink", "file-sink-video");
-  if (!videofileDump_) {
-    GMP_DEBUG_PRINT("Failed to create file sink for video");
+  if (!AddAudioSourceElement())  {
+    GMP_DEBUG_PRINT("Failed to create audio source element");
     return false;
   }
-  std::string vName = dumpName + "_video.data";
-  g_object_set(G_OBJECT(videofileDump_), "location", vName.c_str(), NULL);
-  gst_bin_add_many(GST_BIN(pipeline_), videofileDump_, NULL);
-  gst_element_link_many(sourceList_[IDX_VIDEO]->pSrcElement,
-                        videofileDump_, NULL);
 
-  if (use_audio) {
-    std::string aName = dumpName + "_audio.data";
-    audiofileDump_= gst_element_factory_make("filesink", "file-sink-audio");
-    if (!audiofileDump_) {
-      GMP_DEBUG_PRINT("Failed to create file sink for audio");
-      return false;
+  if (inputDumpFileName != NULL) {
+    if (AddAudioDumpElement()) {
+      GMP_DEBUG_PRINT("Audio stream pipeline created successfully!!!");
+      return true;
     }
-    g_object_set(G_OBJECT(audiofileDump_), "location", aName.c_str(), NULL);
-    gst_bin_add_many(GST_BIN(pipeline_), audiofileDump_, NULL);
-    gst_element_link_many(sourceList_[IDX_AUDIO]->pSrcElement,
-                          audiofileDump_, NULL);
+  } else {
+    if (AddAudioParserElement() &&
+        AddAudioDecoderElement() &&
+        AddAudioConverterElement() &&
+        AddAudioSinkElement()) {
+      GMP_DEBUG_PRINT("Audio stream pipeline created successfully!!!");
+      return true;
+    }
   }
+
+  FreePipelineElements();
+  return false;
+}
+
+bool BufferPlayer::AddVideoPipelineElements() {
+  GMP_DEBUG_PRINT("Create and add elements for video pipeline");
+
+  if (!AddVideoSourceElement()) {
+    GMP_DEBUG_PRINT("Failed to create video source element");
+    return false;
+  }
+
+  if (inputDumpFileName != NULL) {
+    if (AddVideoDumpElement()) {
+      GMP_DEBUG_PRINT("Audio stream pipeline created successfully!!!");
+      return true;
+    }
+  } else {
+    if (AddVideoParserElement() &&
+        AddVideoDecoderElement() &&
+        AddVideoConverterElement() &&
+        AddVideoSinkElement()) {
+      GMP_DEBUG_PRINT("Video stream pipeline created successfully!!!");
+      return true;
+    }
+  }
+
+  FreePipelineElements();
+  return false;
+}
+
+bool BufferPlayer::AddAudioSourceElement() {
+  GMP_DEBUG_PRINT("Create and add audio source element");
+
+  audioSrcInfo_ = std::make_shared<MEDIA_SRC_T>();
+  if (!audioSrcInfo_)
+    return false;
+
+  audioSrcInfo_->needFeedData = CUSTOM_BUFFER_FEED;
+  audioSrcInfo_->totalFeed = 0;
+  audioSrcInfo_->elementName = std::string("audio-app-es");
+
+  audioSrcInfo_->pSrcElement =
+      gst_element_factory_make("appsrc", "audio-app-es");
+  if (!audioSrcInfo_->pSrcElement) {
+    GMP_DEBUG_PRINT("audio-app-e element can not be created!!!");
+    return false;
+  }
+
+  SetAppSrcProperties(audioSrcInfo_.get(), MEDIA_AUDIO_MAX);
+
+  gst_bin_add(GST_BIN(pipeline_), audioSrcInfo_->pSrcElement);
+  linkedElement_ = audioSrcInfo_->pSrcElement;
+
   return true;
 }
 
@@ -757,8 +779,11 @@ bool BufferPlayer::AddAudioParserElement() {
   GMP_DEBUG_PRINT("Create and add audio parser element");
 
   audioPQueue_ = gst_element_factory_make("queue", "audio-parser-queue");
-  if (!audioPQueue_) {
-    GMP_DEBUG_PRINT("Failed to create audio parser queue");
+  if (audioPQueue_)
+    SetQueueBufferSize(audioPQueue_, QUEUE_MAX_SIZE, 0);
+
+  if (!AddAndLinkElement(audioPQueue_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio parser queue element");
     return false;
   }
 
@@ -777,70 +802,20 @@ bool BufferPlayer::AddAudioParserElement() {
       audioParser_ = gst_element_factory_make("dcaparse", "dts-parse");
       break;
     case GMP_AUDIO_CODEC_AAC:
-    default:
       GMP_DEBUG_PRINT("AAC Parser");
       audioParser_ = gst_element_factory_make("aacparse", "aac-parse");
       break;
+    default:
+      GMP_DEBUG_PRINT("Audio codec[%d] not supported", loadData_->audioCodec);
+      return false;
   }
 
-  if (!audioParser_) {
-    GMP_DEBUG_PRINT("Unable to create audio parser");
-    return false;
-  }
-
-  SetQueueBufferSize(audioPQueue_, QUEUE_MAX_SIZE, 0);
-
-  gst_bin_add_many(GST_BIN(pipeline_), audioPQueue_, audioParser_, NULL);
-  if (!gst_element_link_many(sourceList_[IDX_AUDIO]->pSrcElement,
-                        audioPQueue_, audioParser_, NULL)) {
-    GMP_DEBUG_PRINT("Unable to link audio parser element");
+  if (!AddAndLinkElement(audioParser_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio parser element");
     return false;
   }
 
   GMP_DEBUG_PRINT("Audio Parser elements are Added!!!");
-  return true;
-}
-
-bool BufferPlayer::AddVideoParserElement() {
-  GMP_DEBUG_PRINT("Create and add video parser elements");
-
-  videoPQueue_ = gst_element_factory_make("queue", "video-parser-queue");
-  if (!videoPQueue_) {
-    GMP_DEBUG_PRINT("Failed to create video parser queue");
-    return false;
-  }
-
-  switch (loadData_->videoCodec) {
-    case GMP_VIDEO_CODEC_VC1:
-      GMP_DEBUG_PRINT("VC1 Parser");
-      videoParser_ = gst_element_factory_make("vc1parse", "vc1-parse");
-      break;
-    case GMP_VIDEO_CODEC_H265:
-      GMP_DEBUG_PRINT("H265 Parser");
-      videoParser_ = gst_element_factory_make("h265parse", "h265-parse");
-      break;
-    case GMP_VIDEO_CODEC_H264:
-    default:
-      GMP_DEBUG_PRINT("H264 Parser");
-      videoParser_ = gst_element_factory_make("h264parse", "h264-parse");
-      break;
-  }
-
-  if (!videoParser_) {
-    GMP_DEBUG_PRINT("Failed to create video parser");
-    return false;
-  }
-
-  SetQueueBufferSize(videoPQueue_, QUEUE_MAX_SIZE, 0);
-
-  gst_bin_add_many(GST_BIN(pipeline_), videoPQueue_, videoParser_, NULL);
-  if (!gst_element_link_many(sourceList_[IDX_VIDEO]->pSrcElement,
-                             videoPQueue_, videoParser_, NULL)) {
-    GMP_DEBUG_PRINT("Unable to link video parser element");
-    return false;
-  }
-
-  GMP_DEBUG_PRINT("Video Parser elements are Added!!!");
   return true;
 }
 
@@ -862,24 +837,140 @@ bool BufferPlayer::AddAudioDecoderElement() {
       audioDecoder_ = pf::ElementFactory::Create("custom", "audio-codec-dts");
       break;
     case GMP_AUDIO_CODEC_AAC:
-    default:
       GMP_DEBUG_PRINT("AAC Decoder");
       audioDecoder_ = pf::ElementFactory::Create("custom", "audio-codec-aac");
       break;
+    default:
+      GMP_DEBUG_PRINT("Audio codec[%d] not supported", loadData_->audioCodec);
+      return false;
   }
 
-  if (!audioDecoder_) {
-    GMP_DEBUG_PRINT("Unable to create audio Decoder");
-    return false;
-  }
-
-  gst_bin_add_many(GST_BIN(pipeline_), audioDecoder_,  NULL);
-  if (!gst_element_link_many(audioParser_, audioDecoder_, NULL)) {
-    GMP_DEBUG_PRINT("Unable to link audio parser and Decoder");
+  if (!AddAndLinkElement(audioDecoder_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio decoder element");
     return false;
   }
 
   GMP_DEBUG_PRINT("Audio decoder elements are Added!!!");
+  return true;
+}
+
+bool BufferPlayer::AddAudioConverterElement() {
+  GMP_DEBUG_PRINT("Create and add audio converter elements");
+
+  audioConverter_ = gst_element_factory_make("audioconvert", "audio-converter");
+  if (!AddAndLinkElement(audioConverter_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio converter element");
+    return false;
+  }
+
+  aResampler_ = gst_element_factory_make("audioresample", "audio-resampler");
+  if (!AddAndLinkElement(aResampler_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio resampler element");
+    return false;
+  }
+
+  audioVolume_ = gst_element_factory_make("volume", "audio-volume");
+  if (!AddAndLinkElement(audioVolume_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio volume element");
+    return false;
+  }
+
+  GMP_DEBUG_PRINT("Audio converter elements are Added!!!");
+  return true;
+}
+
+bool BufferPlayer::AddAudioSinkElement() {
+  GMP_DEBUG_PRINT("Create and add audio sink element");
+
+  audioQueue_ = gst_element_factory_make("queue", "audiosink-queue");
+  if (!AddAndLinkElement(audioQueue_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio sink queue element");
+    return false;
+  }
+
+  std::string aSinkName = (use_audio ? "audio-sink" : "fake-sink");
+  audioSink_ = pf::ElementFactory::Create("custom", aSinkName,
+                                          display_path_);
+  if (!AddAndLinkElement(audioSink_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio sink element");
+    return false;
+  }
+
+  linkedElement_ = nullptr;
+  GMP_DEBUG_PRINT("Audio sink elements are Added!!!");
+  return true;
+}
+
+bool BufferPlayer::AddVideoSourceElement() {
+  GMP_DEBUG_PRINT("Create and add video source element");
+
+  videoSrcInfo_ = std::make_shared<MEDIA_SRC_T>();
+  if (!videoSrcInfo_)
+    return false;
+
+  videoSrcInfo_->elementName = "video-app-es";
+  videoSrcInfo_->needFeedData = CUSTOM_BUFFER_FEED;
+  videoSrcInfo_->totalFeed = 0;
+
+  videoSrcInfo_->pSrcElement =
+      gst_element_factory_make("appsrc", "video-app-es");
+  if (!videoSrcInfo_->pSrcElement) {
+    GMP_DEBUG_PRINT("audio-app-e element can not be created!!!");
+    return false;
+  }
+
+  SetAppSrcProperties(videoSrcInfo_.get(), MEDIA_VIDEO_MAX);
+
+  if (loadData_->liveStream)
+    g_object_set(videoSrcInfo_->pSrcElement, "is-live", true, NULL);
+
+  gst_bin_add(GST_BIN(pipeline_), videoSrcInfo_->pSrcElement);
+  linkedElement_ = videoSrcInfo_->pSrcElement;
+
+  return true;
+}
+
+bool BufferPlayer::AddVideoParserElement() {
+  GMP_DEBUG_PRINT("Create and add video parser elements");
+
+  videoPQueue_ = gst_element_factory_make("queue", "video-parser-queue");
+  if (videoPQueue_)
+    SetQueueBufferSize(videoPQueue_, QUEUE_MAX_SIZE, 0);
+
+  if (!AddAndLinkElement(videoPQueue_)) {
+    GMP_DEBUG_PRINT("Failed to add and link video parser queue element");
+    return false;
+  }
+
+  if (loadData_->svpVersion) {
+    GMP_DEBUG_PRINT("This is SVP case! Video parser isn't needed!");
+    return true;
+  }
+
+  switch (loadData_->videoCodec) {
+    case GMP_VIDEO_CODEC_VC1:
+      GMP_DEBUG_PRINT("VC1 Parser");
+      videoParser_ = gst_element_factory_make("vc1parse", "vc1-parse");
+      break;
+    case GMP_VIDEO_CODEC_H264:
+      GMP_DEBUG_PRINT("H264 Parser");
+      videoParser_ = gst_element_factory_make("h264parse", "h264-parse");
+      break;
+    case GMP_VIDEO_CODEC_H265:
+      GMP_DEBUG_PRINT("H265 Parser");
+      videoParser_ = gst_element_factory_make("h265parse", "h265-parse");
+      break;
+    default:
+      GMP_DEBUG_PRINT("Video codec[%d] not supported", loadData_->videoCodec);
+      return false;
+  }
+
+  if (!AddAndLinkElement(videoParser_)) {
+    GMP_DEBUG_PRINT("Failed to add & link video parser element");
+    return false;
+  }
+
+  GMP_DEBUG_PRINT("Video Parser elements are Added!!!");
   return true;
 }
 
@@ -891,35 +982,29 @@ bool BufferPlayer::AddVideoDecoderElement() {
       GMP_DEBUG_PRINT("VC1 Decoder");
       videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-vc1");
       break;
+    case GMP_VIDEO_CODEC_H264:
+      GMP_DEBUG_PRINT("H264 Decoder");
+      videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-h264");
+      break;
     case GMP_VIDEO_CODEC_H265:
       GMP_DEBUG_PRINT("H265 Decoder");
       videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-h265");
       break;
-    case GMP_VIDEO_CODEC_H264:
     default:
-      GMP_DEBUG_PRINT("H264 Decoder");
-      videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-h264");
-      break;
+      GMP_DEBUG_PRINT("Video codec[%d] not supported", loadData_->videoCodec);
+      return false;
   }
 
-  if (!videoDecoder_) {
-    GMP_DEBUG_PRINT("Unable to create video Decoder element");
+  if (!AddAndLinkElement(videoDecoder_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio decoder element");
     return false;
   }
 
   videoPostProc_ = pf::ElementFactory::Create("custom", "vaapi-postproc");
   if (videoPostProc_) {
     // This is only for INTEL based platform (Using gst-vaaapi).
-    gst_bin_add_many(GST_BIN(pipeline_), videoDecoder_, videoPostProc_, NULL);
-    if (!gst_element_link_many(videoParser_, videoDecoder_, videoPostProc_,
-        NULL)) {
-      GMP_DEBUG_PRINT("Unable to link video parser and Decoder");
-      return false;
-    }
-  } else {
-    gst_bin_add_many(GST_BIN(pipeline_), videoDecoder_, NULL);
-    if (!gst_element_link_many(videoParser_, videoDecoder_, NULL)) {
-      GMP_DEBUG_PRINT("Unable to link video parser and Decoder");
+    if (!AddAndLinkElement(videoPostProc_)) {
+      GMP_DEBUG_PRINT("Failed to add & link video post processor element");
       return false;
     }
   }
@@ -928,119 +1013,127 @@ bool BufferPlayer::AddVideoDecoderElement() {
   return true;
 }
 
-bool BufferPlayer::AddAudioConverterElement() {
-  GMP_DEBUG_PRINT("Create and add audio converter element");
-
-  audioQueue_ = gst_element_factory_make("queue", "audio-queue");
-  if (!audioQueue_) {
-    GMP_DEBUG_PRINT("Failed to create audio queue element");
-    return false;
-  }
-
-  audioConverter_ = gst_element_factory_make("audioconvert", "audio-converter");
-  if (!audioConverter_) {
-    GMP_DEBUG_PRINT("Failed to create audio converted element");
-    return false;
-  }
-
-  aResampler_ = gst_element_factory_make("audioresample", "audio-resampler");
-  if (!aResampler_) {
-    GMP_DEBUG_PRINT("Failed to create audio ressampler element");
-    return false;
-  }
-
-  gst_bin_add_many(GST_BIN(pipeline_), audioQueue_, audioConverter_,
-                   aResampler_, NULL);
-  if (!gst_element_link_many(audioDecoder_, audioQueue_, audioConverter_,
-                             aResampler_, NULL)) {
-    GMP_DEBUG_PRINT("Failed to link audio conveter elements");
-    return false;
-  }
-
-  GMP_DEBUG_PRINT("Audio converter elements are Added!!!");
-  return true;
-}
-
 bool BufferPlayer::AddVideoConverterElement() {
   GMP_DEBUG_PRINT("Create and add video converter element");
 
+  videoQueue_ = pf::ElementFactory::Create("custom", "video-queue");
+  if (videoQueue_) {
+    if (!AddAndLinkElement(videoQueue_)) {
+      GMP_DEBUG_PRINT("Failed to add & link video queue element");
+      return false;
+    }
+  }
+
   vConverter_ = pf::ElementFactory::Create("custom", "video-converter");
   if (vConverter_) {
-    gint scale_width = VIDEO_SCALE_WIDTH;
-    gint scale_height = (loadData_->height * scale_width) / loadData_->width;
-    lsm_connector_.setVideoSize(scale_width, scale_height);
-
-    videoQueue_ = pf::ElementFactory::Create("custom", "video-queue");
-    if (videoQueue_) {
-      gst_bin_add_many(GST_BIN(pipeline_), videoQueue_, vConverter_, NULL);
-      if (!gst_element_link_many(videoDecoder_, videoQueue_, vConverter_,
-          NULL)) {
-        GMP_DEBUG_PRINT("Failed to link video converter elements");
-        return false;
-      }
-    } else {
-      gst_bin_add_many(GST_BIN(pipeline_), vConverter_, NULL);
-      if (!gst_element_link_many(videoDecoder_, vConverter_, NULL)) {
-        GMP_DEBUG_PRINT("Failed to link video converter elements");
-        return false;
-      }
+    if (!AddAndLinkElement(vConverter_)) {
+      GMP_DEBUG_PRINT("Failed to add & link video converter element");
+      return false;
     }
-    linkElement_ = vConverter_;
-    GMP_DEBUG_PRINT("Video converter element are Added!!!");
   } else {
     GMP_DEBUG_PRINT("Video converter element not needed!!!");
-    linkElement_ = videoDecoder_;
   }
 
-  return true;
-}
-
-bool BufferPlayer::AddAudioSinkElement() {
-  GMP_DEBUG_PRINT("Create and add audio sink element");
-
-  audioVolume_ = gst_element_factory_make("volume", "audio-volume");
-  if (!audioVolume_) {
-    GMP_DEBUG_PRINT("Failed to create audio volume");
-    return false;
-  }
-
-  std::string aSinkName = (use_audio ? "audio-sink" : "fake-sink");
-  audioSink_ = pf::ElementFactory::Create("custom", aSinkName, display_path_);
-  if (!audioSink_) {
-    GMP_DEBUG_PRINT("Failed to create audio sink element");
-    return false;
-  }
-
-  gst_bin_add_many(GST_BIN(pipeline_), audioVolume_, audioSink_, NULL);
-  if (!gst_element_link_many(aResampler_, audioVolume_, audioSink_, NULL)) {
-    GMP_DEBUG_PRINT("Failed to link audio sink elements");
-    return false;
-  }
-
-  GMP_DEBUG_PRINT("Audio sink elements are Added!!!");
   return true;
 }
 
 bool BufferPlayer::AddVideoSinkElement() {
-  GMP_DEBUG_PRINT("Create and add video sink element");
+   GMP_DEBUG_PRINT("Create and add video sink element");
 
   videoSink_ = pf::ElementFactory::Create("custom", "video-sink");
-  if (!videoSink_) {
-    GMP_DEBUG_PRINT("Failed to create video sink");
+  if (!AddAndLinkElement(videoSink_)) {
+    GMP_DEBUG_PRINT("Failed to add & link video sink element");
     return false;
   }
 
-  gst_bin_add_many(GST_BIN(pipeline_), videoSink_, NULL);
-  if (!gst_element_link_many(linkElement_, videoSink_, NULL)) {
-    GMP_DEBUG_PRINT("Failed to link video sink elements");
-    return false;
-  }
-  linkElement_ = nullptr;
-
+  linkedElement_ = nullptr;
   GMP_DEBUG_PRINT("Video sink elements are Added!!!");
   return true;
 }
 
+void BufferPlayer::FreePipelineElements() {
+  audioSrcInfo_.reset();
+  videoSrcInfo_.reset();
+
+  gst_object_unref(pipeline_);
+  pipeline_ = NULL;
+}
+
+bool BufferPlayer::AddAndLinkElement(GstElement* new_element) {
+  if (new_element == nullptr) {
+    GMP_DEBUG_PRINT("new_element is NULL pointer!");
+    return false;
+  }
+
+  gchar *elementName = gst_element_get_name(new_element);
+  if (elementName) {
+    GMP_DEBUG_PRINT("Adding new_element named [ %s]", elementName);
+    g_free(elementName);
+  }
+
+  gst_bin_add(GST_BIN(pipeline_), new_element);
+  if (gst_element_link(linkedElement_, new_element)) {
+    linkedElement_ = new_element;
+    return true;
+  }
+  return false;
+}
+
+bool BufferPlayer::AddAudioDumpElement() {
+  if (!audioSrcInfo_ || !audioSrcInfo_->pSrcElement)
+    return true;
+
+  GMP_INFO_PRINT("Create Element for Dumping audio data");
+
+  std::string dumpFileName("/tmp/");
+  dumpFileName.append(inputDumpFileName);
+  dumpFileName.append(std::string("_audio.data"));
+
+  audiofileDump_= gst_element_factory_make("filesink", "file-sink-audio");
+  if (!audiofileDump_) {
+    GMP_DEBUG_PRINT("Failed to create file sink element for audio");
+    return false;
+  }
+
+  g_object_set(G_OBJECT(audiofileDump_),
+               "location", dumpFileName.c_str(), NULL);
+
+  if (!AddAndLinkElement(audiofileDump_)) {
+    GMP_DEBUG_PRINT("Failed to add & link audio file sink element");
+    return false;
+  }
+
+  linkedElement_ = nullptr;
+  return true;
+}
+
+bool BufferPlayer::AddVideoDumpElement() {
+  if (!videoSrcInfo_ || !videoSrcInfo_->pSrcElement)
+    return true;
+
+  GMP_INFO_PRINT("Create Element for Dumping video data");
+
+  std::string dumpFileName("/tmp/");
+  dumpFileName.append(inputDumpFileName);
+  dumpFileName.append(std::string("_video.data"));
+
+  videofileDump_= gst_element_factory_make("filesink", "file-sink-video");
+  if (!videofileDump_) {
+    GMP_DEBUG_PRINT("Failed to create file sink element for video");
+    return false;
+  }
+
+  g_object_set(G_OBJECT(videofileDump_),
+               "location", dumpFileName.c_str(), NULL);
+
+  if (!AddAndLinkElement(videofileDump_)) {
+    GMP_DEBUG_PRINT("Failed to add & link video file sink element");
+    return false;
+  }
+
+  linkedElement_ = nullptr;
+  return true;
+}
 
 bool BufferPlayer::ConnectBusCallback() {
   GMP_DEBUG_PRINT("ConnectBusCallback");
@@ -1115,9 +1208,15 @@ bool BufferPlayer::SeekInternal(const int64_t msecond) {
   if (!pipeline_ || currentState_ == STOPPED_STATE || !load_complete_)
     return false;
 
-  memset(&totalFeed_, 0x00, (sizeof(guint64)*IDX_MAX));
-  needFeedData_[IDX_VIDEO] = CUSTOM_BUFFER_LOCKED;
-  needFeedData_[IDX_AUDIO] = CUSTOM_BUFFER_LOCKED;
+  if (videoSrcInfo_) {
+    videoSrcInfo_->totalFeed = 0;
+    videoSrcInfo_->needFeedData = CUSTOM_BUFFER_LOCKED;
+  }
+
+  if (audioSrcInfo_) {
+    audioSrcInfo_->totalFeed = 0;
+    audioSrcInfo_->needFeedData = CUSTOM_BUFFER_LOCKED;
+  }
 
   recEndOfStream_ = false;
   feedPossible_ = false;
@@ -1137,44 +1236,20 @@ bool BufferPlayer::SeekInternal(const int64_t msecond) {
   return true;
 }
 
-void BufferPlayer::SetAppSrcBufferLevel(MEDIA_SRC_ELEM_IDX_T srcIdx,
-                                        MEDIA_SRC_T *pSrcInfo) {
-  guint64 bufferMaxLevel = 0;
-  guint32 bufferMinPercent = BUFFER_MIN_PERCENT;
-
-  if (srcIdx == IDX_AUDIO)
-    bufferMaxLevel = MEDIA_AUDIO_MAX;
-  else if (srcIdx == IDX_VIDEO)
-    bufferMaxLevel = MEDIA_VIDEO_MAX;
-
-  g_object_set(G_OBJECT(pSrcInfo->pSrcElement),
-               "format", GST_FORMAT_TIME,
-               "max-bytes", bufferMaxLevel,
-               "min-percent", bufferMinPercent,
-               NULL);
-
-  pSrcInfo->bufferMaxByte = bufferMaxLevel;
-  pSrcInfo->bufferMinPercent = bufferMinPercent;
-
-  guint64 maxBufferSize = 0;
-  g_object_get(G_OBJECT(pSrcInfo->pSrcElement),
-               "max-bytes", &maxBufferSize, NULL);
-  GMP_DEBUG_PRINT("srcIdx[%d], maxBufferSize[%" G_GUINT64_FORMAT "]", srcIdx, maxBufferSize);
-}
-
-bool BufferPlayer::IsBufferAvailable(MEDIA_SRC_ELEM_IDX_T srcIdx,
-                                     guint64 newBufferSize){
+bool BufferPlayer::IsBufferAvailable(MEDIA_SRC_T* pAppSrcInfo,
+                                     guint64 newBufferSize) {
   guint64 maxBufferSize = 0, currBufferSize = 0, availableSize = 0;
   bool bBufferAvailable = false;
 
-  if (sourceList_[srcIdx]->pSrcElement != NULL) {
-    g_object_get(G_OBJECT(sourceList_[srcIdx]->pSrcElement),
+  if (pAppSrcInfo->pSrcElement != NULL) {
+    g_object_get(G_OBJECT(pAppSrcInfo->pSrcElement),
                  "current-level-bytes", &currBufferSize, NULL);
-    g_object_get(G_OBJECT(sourceList_[srcIdx]->pSrcElement),
+    g_object_get(G_OBJECT(pAppSrcInfo->pSrcElement),
                  "max-bytes", &maxBufferSize, NULL);
-    GMP_DEBUG_PRINT("srcIdx = %d, maxBufferSize = %" G_GUINT64_FORMAT
+    GMP_DEBUG_PRINT("[%s], maxBufferSize = %" G_GUINT64_FORMAT
                     ", currBufferSize = %" G_GUINT64_FORMAT,
-                    srcIdx, maxBufferSize, currBufferSize);
+                    pAppSrcInfo->elementName.c_str(),
+                    maxBufferSize, currBufferSize);
   }
 
   if (maxBufferSize <= currBufferSize)
@@ -1182,9 +1257,9 @@ bool BufferPlayer::IsBufferAvailable(MEDIA_SRC_ELEM_IDX_T srcIdx,
   else
     availableSize = maxBufferSize - currBufferSize;
 
-  GMP_DEBUG_PRINT("srcIdx = %d, availableSize = %" G_GUINT64_FORMAT
+  GMP_DEBUG_PRINT("[%s], availableSize = %" G_GUINT64_FORMAT
                   ", newBufferSize = %" G_GUINT64_FORMAT,
-                  srcIdx, availableSize, newBufferSize);
+                  pAppSrcInfo->elementName.c_str(), availableSize, newBufferSize);
   if (availableSize >= newBufferSize) {
     GMP_DEBUG_PRINT("buffer space is availabe (size:%" G_GUINT64_FORMAT ")",
       availableSize);
@@ -1196,16 +1271,16 @@ bool BufferPlayer::IsBufferAvailable(MEDIA_SRC_ELEM_IDX_T srcIdx,
   return bBufferAvailable;
 }
 
-bool BufferPlayer::IsFeedPossible(MEDIA_SRC_ELEM_IDX_T srcIdx,
+bool BufferPlayer::IsFeedPossible(MEDIA_SRC_T* pAppSrcInfo,
                                   guint64 newBufferSize) {
-  if (needFeedData_[srcIdx] == CUSTOM_BUFFER_FULL) {
-    if (IsBufferAvailable(srcIdx, newBufferSize)) {
-      needFeedData_[srcIdx] = CUSTOM_BUFFER_FEED;
+  if (pAppSrcInfo->needFeedData == CUSTOM_BUFFER_FULL) {
+    if (IsBufferAvailable(pAppSrcInfo, newBufferSize)) {
+      pAppSrcInfo->needFeedData = CUSTOM_BUFFER_FEED;
       return true;
     }
     return false;
   }
-  needFeedData_[srcIdx] = CUSTOM_BUFFER_FEED;
+  pAppSrcInfo->needFeedData = CUSTOM_BUFFER_FEED;
 
   return true;
 }
@@ -1252,6 +1327,10 @@ void BufferPlayer::HandleBusStateMsg(GstMessage *pMessage)  {
         if (cbFunction_)
           cbFunction_(NOTIFY_PAUSED, 0, nullptr, nullptr);
       }
+      if (cbFunction_ && loadData_->liveStream && !load_complete_) {
+        load_complete_ = true;
+        cbFunction_(NOTIFY_LOAD_COMPLETED, 0, nullptr, nullptr);
+      }
       break;
     }
     case GST_STATE_PLAYING: {
@@ -1280,8 +1359,8 @@ void BufferPlayer::HandleBusAsyncMsg() {
     if (recEndOfStream_)
       return;
 
-    if (needFeedData_[IDX_VIDEO] != CUSTOM_BUFFER_LOW)
-      needFeedData_[IDX_VIDEO] = CUSTOM_BUFFER_LOW;
+    if (videoSrcInfo_ && videoSrcInfo_->needFeedData != CUSTOM_BUFFER_LOW)
+      videoSrcInfo_->needFeedData = CUSTOM_BUFFER_LOW;
   } else if (seeking_) {
     seeking_ = false;
     if (cbFunction_)
@@ -1341,7 +1420,7 @@ void BufferPlayer::HandleStreamStatsMsg(GstMessage *pMessage) {
 bool BufferPlayer::UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData) {
   GMP_DEBUG_PRINT("loadData(%p)", loadData);
 
-  loadData_ = new MEDIA_LOAD_DATA_T();
+  loadData_ = std::make_shared<MEDIA_LOAD_DATA_T>();
   if (loadData_) {
     loadData_->maxWidth = loadData->maxWidth;
     loadData_->maxHeight = loadData->maxHeight;
@@ -1366,6 +1445,8 @@ bool BufferPlayer::UpdateLoadData(const MEDIA_LOAD_DATA_T* loadData) {
     loadData_->drmType = loadData->drmType;
     loadData_->svpVersion = loadData->svpVersion;
     loadData_->displayPath = loadData->displayPath;
+    loadData_->liveStream = loadData->liveStream;
+    loadData_->sampleFormat = loadData->sampleFormat;
     return true;
   }
   return false;
@@ -1402,10 +1483,9 @@ void BufferPlayer::NotifyVideoInfo() {
         videoInfo_.width, videoInfo_.height);
 
     gmp::parser::Composer composer;
-    composer.put("videoInfo", videoInfo_);
-    cbFunction_(NOTIFY_VIDEO_INFO,
-        0, composer.result().c_str(),
-        static_cast<void*>(&videoInfo_));
+    composer.put("video", videoInfo_);
+    cbFunction_(NOTIFY_VIDEO_INFO, 0, composer.result().c_str(),
+                static_cast<void*>(&videoInfo_));
   }
 }
 
@@ -1415,25 +1495,29 @@ void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer userData) {
   if (!gstAppSrc)
     return;
 
-  gint32 srcIdx = 1;
+  BufferPlayer *player = reinterpret_cast <BufferPlayer*>(userData);
+
+  MEDIA_DATA_CHANNEL_T dataChType = MEDIA_DATA_CH_NONE;
+  MEDIA_SRC_T* pAppSrcInfo = nullptr;
   if (IsElementName(gstAppSrc, "video-app-es")) {
-    srcIdx = 0;
+    dataChType = MEDIA_DATA_CH_A;
+    pAppSrcInfo = player->videoSrcInfo_.get();
   } else  if(IsElementName(gstAppSrc, "audio-app-es")) {
-    srcIdx = 1;
+    dataChType = MEDIA_DATA_CH_B;
+    pAppSrcInfo = player->audioSrcInfo_.get();
   }
 
-  BufferPlayer *player = reinterpret_cast <BufferPlayer*>(userData);
-  if ((player->needFeedData_[srcIdx] != CUSTOM_BUFFER_FULL) &&
-      (player->needFeedData_[srcIdx] != CUSTOM_BUFFER_LOCKED)) {
+  if ((pAppSrcInfo->needFeedData != CUSTOM_BUFFER_FULL) &&
+      (pAppSrcInfo->needFeedData != CUSTOM_BUFFER_LOCKED)) {
     guint64 currBufferSize = 0;
     g_object_get(G_OBJECT(gstAppSrc),
                  "current-level-bytes", &currBufferSize, NULL);
     GMP_DEBUG_PRINT("currBufferSize [ %" G_GUINT64_FORMAT " ]", currBufferSize);
 
-    player->needFeedData_[srcIdx] = CUSTOM_BUFFER_FULL;
+    pAppSrcInfo->needFeedData = CUSTOM_BUFFER_FULL;
 
-    if (srcIdx == IDX_VIDEO && player->cbFunction_)
-      player->cbFunction_(NOTIFY_BUFFER_FULL, srcIdx, nullptr, nullptr);
+    if (pAppSrcInfo == player->videoSrcInfo_.get() && player->cbFunction_)
+      player->cbFunction_(NOTIFY_BUFFER_FULL, dataChType, nullptr, nullptr);
   }
 }
 
@@ -1446,25 +1530,16 @@ gboolean BufferPlayer::SeekData(GstElement *gstAppSrc, guint64 position,
 void BufferPlayer::SetDecoderSpecificInfomation() {
   GMP_DEBUG_PRINT("");
 
-  for (auto mediaSource : sourceList_) {
-    if (mediaSource->pSrcElement == NULL)
-      return;
-  }
-/*
-  // amazon test
-  loadData_->channels = 2;
-  loadData_->sampleRate = 48000;
-  loadData_->audioObjectType = 2;
-  loadData_->format = "raw";
-*/
-
   // to support aac raw stream for amazon
-  if (!g_strcmp0(loadData_->format, "raw") && loadData_->audioCodec == GMP_AUDIO_CODEC_AAC) {
-    gmp::dsi::DSIGeneratorFactory factory(loadData_);
+  if (audioSrcInfo_ && audioSrcInfo_->pSrcElement &&
+      !g_strcmp0(loadData_->format, "raw") &&
+      loadData_->audioCodec == GMP_AUDIO_CODEC_AAC) {
+    gmp::dsi::DSIGeneratorFactory factory(loadData_.get());
     std::shared_ptr<gmp::dsi::DSIGenerator> sp = factory.getDSIGenerator();
     GstCaps* caps = sp->GenerateSpecificInfo();
     if (caps != NULL) {
-      GstPad *srcPad = gst_element_get_static_pad(sourceList_[IDX_AUDIO]->pSrcElement, "src");
+      GstPad *srcPad =
+          gst_element_get_static_pad(audioSrcInfo_->pSrcElement, "src");
       gst_pad_set_caps(srcPad, caps);
       gst_pad_use_fixed_caps(srcPad);
       gst_object_unref(srcPad);
@@ -1512,8 +1587,68 @@ base::source_info_t BufferPlayer::GetSourceInfo(
   return source_info;
 }
 
+void BufferPlayer::SetAppSrcProperties(MEDIA_SRC_T* pAppSrcInfo,
+                                       guint64 bufferMaxLevel) {
+  guint32 bufferMinPercent = BUFFER_MIN_PERCENT;
+
+  gst_util_set_object_arg(G_OBJECT(pAppSrcInfo->pSrcElement),
+                              "stream-type", "seekable");
+
+  g_object_set(G_OBJECT(pAppSrcInfo->pSrcElement),
+               "format", GST_FORMAT_TIME,
+               "max-bytes", bufferMaxLevel,
+               "min-percent", bufferMinPercent,
+               NULL);
+
+  g_signal_connect(reinterpret_cast<GstAppSrc*>(pAppSrcInfo->pSrcElement),
+                   "enough-data", G_CALLBACK(EnoughData), this);
+  g_signal_connect(reinterpret_cast<GstAppSrc*>(pAppSrcInfo->pSrcElement),
+                   "seek-data", G_CALLBACK(SeekData), this);
+
+  pAppSrcInfo->bufferMaxByte = bufferMaxLevel;
+  pAppSrcInfo->bufferMinPercent = bufferMinPercent;
+
+  gchar * srcReadName = NULL;
+  g_object_get(G_OBJECT(pAppSrcInfo->pSrcElement), "name", &srcReadName, NULL);
+
+  if (srcReadName) {
+    pAppSrcInfo->elementName = std::string(srcReadName);
+    GMP_DEBUG_PRINT("app src properties set for[ %s ]", srcReadName);
+    g_free(srcReadName);
+  }
+}
+
 void BufferPlayer::SetDebugDumpFileName() {
   inputDumpFileName = getenv("GST_DUMP_FILENAME");
+}
+
+void BufferPlayer::PrintLoadData(const MEDIA_LOAD_DATA_T* loadData) {
+  GMP_DEBUG_PRINT("------------VIDEO information------------");
+  GMP_DEBUG_PRINT("video codec[%d]", loadData->videoCodec);
+  GMP_DEBUG_PRINT("maxWidth[%d], maxHeight[%d], maxFrameRate[%d]",
+                  loadData->maxWidth, loadData->maxHeight, loadData->maxFrameRate);
+  GMP_DEBUG_PRINT("width[%d], height[%d], frameRate[%d]",
+                  loadData->width, loadData->height, loadData->frameRate);
+  GMP_DEBUG_PRINT("ptsToDecode[%" G_GINT64_FORMAT"]", loadData->ptsToDecode);
+  GMP_DEBUG_PRINT("extraData[%p], extraSize[%d]", loadData->extraData, loadData->extraSize);
+  GMP_DEBUG_PRINT("windowId[%s]", loadData->windowId);
+  GMP_DEBUG_PRINT("-----------------------------------------");
+  GMP_DEBUG_PRINT("------------AUDIO information------------");
+  GMP_DEBUG_PRINT("audio codec[%d]", loadData->audioCodec);
+  GMP_DEBUG_PRINT("channels[%d], sampleRate[%d], blockAlign[%d]",
+                  loadData->channels, loadData->sampleRate, loadData->blockAlign);
+  GMP_DEBUG_PRINT("bitRate[%d], bitsPerSample[%d], format[%s], sampleFormat[%d], audioObjectType[%d]",
+                  loadData->bitRate, loadData->bitsPerSample, loadData->format,
+                  loadData->sampleFormat, loadData->audioObjectType);
+  GMP_DEBUG_PRINT("codecData[%p], codecDataSize[%d]",
+                  loadData->codecData, loadData->codecDataSize);
+  GMP_DEBUG_PRINT("-----------------------------------------");
+  GMP_DEBUG_PRINT("-------------DRM information-------------");
+  GMP_DEBUG_PRINT("drmType[%d], svpVersion[%d]", loadData->drmType, loadData->svpVersion);
+  GMP_DEBUG_PRINT("-----------------------------------------");
+  GMP_DEBUG_PRINT("-------------ETC information-------------");
+  GMP_DEBUG_PRINT("liveStream[%s]", loadData->liveStream ? "yes" : "no");
+  GMP_DEBUG_PRINT("-----------------------------------------");
 }
 
 }  // namespace player

@@ -20,7 +20,6 @@
 #include "ElementFactory.h"
 #include "requestor.h"
 #include "PlayerFactory.h"
-
 #include "parser/parser.h"
 
 namespace gmp { namespace player {
@@ -227,7 +226,7 @@ MEDIA_STATUS_T MediaPlayerClient::Feed(const guint8* pBuffer,
                                              guint64 pts,
                                              MEDIA_DATA_CHANNEL_T esData) {
   if (!player_ || !isLoaded_) {
-    GMP_INFO_PRINT("Invalid MediaPlayerClient state, player should be loaded");
+    GMP_INFO_PRINT("Invalid state, player(%p) should be loaded", player_.get());
     return MEDIA_NOT_READY;
   }
   return player_->Feed(pBuffer, bufferSize, pts, esData);
@@ -332,7 +331,7 @@ const char* MediaPlayerClient::GetMediaID() {
 void MediaPlayerClient::NotifyFunction(const gint cbType, const gint64 numValue,
   const gchar *strValue, void *udata) {
   GMP_DEBUG_PRINT("type:%d, numValue:%" G_GINT64_FORMAT ", strValue:%p, udata:%p",
-    cbType, numValue, strValue, udata);
+                  cbType, numValue, strValue, udata);
 
   switch (cbType) {
     case NOTIFY_LOAD_COMPLETED: {
