@@ -1,6 +1,6 @@
 // @@@LICENSE
 //
-// Copyright (C) 2019, LG Electronics, All Right Reserved.
+// Copyright (C) 2019-2020, LG Electronics, All Right Reserved.
 //
 // No part of this source code may be communicated, distributed, reproduced
 // or transmitted in any form or by any means, electronic or mechanical or
@@ -18,7 +18,8 @@
 namespace gmp {
 namespace player {
 
-AbstractPlayer::AbstractPlayer() {
+AbstractPlayer::AbstractPlayer() :
+  lsClient_(std::make_unique<gmp::LunaServiceClient>()) {
   SetGstreamerDebug();
   SetUseAudio();
   gst_init(NULL, NULL);

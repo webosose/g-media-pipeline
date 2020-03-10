@@ -2,17 +2,17 @@
     "exeName":"@WEBOS_INSTALL_SBINDIR@/g-media-pipeline",
     "type": "regular",
     "allowedNames": [
-        "com.webos.pipeline.*",
-        "com.webos.rm.client.*"
+        "com.webos.pipeline*",
+        "com.webos.rm.client*"
     ],
     "permissions": [
         {
-            "service":"com.webos.pipeline.*",
-            "outbound": ["com.webos.media"]
+            "service":"com.webos.pipeline*",
+            "outbound": ["com.webos.media","com.webos.service.audio"]
         },
         {
-            "service":"com.webos.rm.client.*",
-            "outbound": ["com.webos.media"]
+            "service":"com.webos.rm.client*",
+            "outbound": ["com.webos.media","com.webos.service.audio"]
         }
     ]
 }

@@ -1,8 +1,8 @@
 {
-    "com.webos.pipeline.*": [
+    "com.webos.pipeline*": [
         "media"
     ],
-    "com.webos.rm.client.*": [
+    "com.webos.rm.client*": [
         "media"
     ]
 }

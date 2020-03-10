@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,10 @@
 #ifndef SRC_PLAYER_ABSTRACTPLAYER_H_
 #define SRC_PLAYER_ABSTRACTPLAYER_H_
 
+#include <memory>
+
 #include "Player.h"
+#include "lunaserviceclient/LunaServiceClient.h"
 
 #define VIDEO_SCALE_WIDTH 1080
 #define VIDEO_SCALE_HEIGHT 540
@@ -85,6 +88,7 @@ class AbstractPlayer : public Player {
   LSM::Connector lsm_connector_;
   std::string display_mode_ = "Default";
   std::string window_id_;
+  std::unique_ptr<gmp::LunaServiceClient> lsClient_;
 };
 
 }  // namespace player

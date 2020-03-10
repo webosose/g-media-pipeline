@@ -1,4 +1,4 @@
-# Copyright (c) 2018 LG Electronics, Inc.
+# Copyright (c) 2018-2020 LG Electronics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,6 +85,7 @@ set(G-MEDIA-PIPELINE_HEADERS
     ../playerfactory/ElementFactory.h
     ../playerfactory/PlayerFactory.h
     ../mediaplayerclient/MediaPlayerClient.h
+    ../lunaserviceclient/LunaServiceClient.h
     )
 
 set(G-MEDIA-PIPELINE_SRC
@@ -104,6 +105,7 @@ set(G-MEDIA-PIPELINE_SRC
     ../playerfactory/ElementFactory.cpp
     ../playerfactory/PlayerFactory.cpp
     ../mediaplayerclient/MediaPlayerClient.cpp
+    ../lunaserviceclient/LunaServiceClient.cpp
     )
 
 set(G-MEDIA-PIPELINE_LIB
@@ -118,6 +120,7 @@ set(G-MEDIA-PIPELINE_LIB
     ${PBNJSON_LIBRARIES}
     ${PMLOG_LIBRARIES}
     ${MRD_PKG_LIBRARIES}
+    ${LUNA_LIBRARIES}
     )
 
 add_library(gmp-player SHARED ${G-MEDIA-PIPELINE_SRC})

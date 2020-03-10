@@ -1,6 +1,6 @@
 // @@@LICENSE
 //
-// Copyright (C) 2018-2019, LG Electronics, All Right Reserved.
+// Copyright (C) 2018-2020, LG Electronics, All Right Reserved.
 //
 // No part of this source code may be communicated, distributed, reproduced
 // or transmitted in any form or by any means, electronic or mechanical or
@@ -242,8 +242,19 @@ bool BufferPlayer::Seek(const int64_t msecond) {
 }
 
 bool BufferPlayer::SetVolume(int volume) {
-  GMP_DEBUG_PRINT("Custom pipeline does not have volume setting.");
-  return false;
+  GMP_INFO_PRINT("SetVolume : volume %d", volume);
+
+  pbnjson::JValue jsonValue = pbnjson::Object();
+  jsonValue.put("volume", pbnjson::JValue(volume));
+  std::string jsonStr = jsonValue.stringify();
+
+  const std::string uri = "luna://com.webos.service.audio/media/setVolume";
+
+  ResponseHandler nullcb;
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+                   : false;
+
+  return ret;
 }
 
 bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {

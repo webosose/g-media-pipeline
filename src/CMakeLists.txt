@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019 LG Electronics, Inc.
+# Copyright (c) 2018-2020 LG Electronics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ endif (PMLOGLIB_FOUND)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 include_directories(.)
+
+include_directories(./lunaserviceclient)
 
 include_directories(./base)
 
