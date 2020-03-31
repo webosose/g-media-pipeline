@@ -1,14 +1,12 @@
 /*
- * Copyright (c) 2008-2019 LG Electronics, Inc.
+ * Copyright (c) 2008-2020 LG Electronics, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
-
-
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -46,6 +44,7 @@ ResourceRequestor::ResourceRequestor(const std::string& appId, const std::string
   : rc_(shared_ptr<MRC>(MRC::create())),
     appId_(appId),
     cb_(nullptr),
+    isUnloading_(false),
     allowPolicy_(true) {
   try {
     if (connectionId.empty()) {
@@ -217,7 +216,7 @@ bool ResourceRequestor::policyActionHandler(const char *action,
   GMP_DEBUG_PRINT("policyActionHandler action:%s, resources:%s, type:%s, name:%s, id:%s",
         action, resources, requestorType, requestorName, connectionId);
   if (allowPolicy_) {
-    if (nullptr != cb_) {
+    if ((nullptr != cb_) && !isUnloading_) {
       cb_();
     }
     if (!umsRMC_->release(acquiredResource_)) {

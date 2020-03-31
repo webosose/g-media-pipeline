@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -110,11 +110,6 @@ void Service::Notify(const gint notification, const gint64 numValue, const gchar
       error.mediaId = media_id_;
       composer.put("error", error);
 
-      if (numValue == GMP_ERROR_RES_ALLOC) {
-        GMP_DEBUG_PRINT("policy action occured!");
-        // TODO(nakyeon) : Check unload event from ums is coming after this notification
-        this->media_player_client_.reset();
-      }
       break;
     }
     case NOTIFY_BUFFER_RANGE: {
@@ -222,6 +217,10 @@ bool Service::UnloadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *messa
     error.errorText = "Unload Failed";
     instance_->Notify(NOTIFY_ERROR, 0, nullptr, static_cast<void*>(&error));
   }
+
+  instance_->media_player_client_.reset();
+  instance_->Notify(NOTIFY_UNLOAD_COMPLETED, 0, nullptr, nullptr);
+
   return ret;
 }
 

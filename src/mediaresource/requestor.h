@@ -1,14 +1,12 @@
 /*
- * Copyright (c) 2008-2019 LG Electronics, Inc.
+ * Copyright (c) 2008-2020 LG Electronics, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
-
-
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -90,6 +88,7 @@ class ResourceRequestor {
   bool setSourceInfo(const gmp::base::source_info_t &sourceInfo);
   void setAppId(std::string id);
   int32_t getDisplayPath();
+  void setIsUnloading(bool isUnloading) { isUnloading_ = isUnloading; }
 
  private:
   bool policyActionHandler(const char *action,
@@ -118,6 +117,7 @@ class ResourceRequestor {
   videoResData_t videoResData_;
   audioResData_t audioResData_;
   ums::video_info_t video_info_;
+  bool isUnloading_;
   bool allowPolicy_;
 };
 

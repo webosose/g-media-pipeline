@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,9 @@ MediaPlayerClient::MediaPlayerClient(const std::string& appId, const std::string
 
 MediaPlayerClient::~MediaPlayerClient() {
   GMP_DEBUG_PRINT("");
+
+  resourceRequestor_->setIsUnloading(true);
+
   if (isLoaded_) {
     GMP_DEBUG_PRINT("Unload() should be called if it is still loaded");
     Unload();
@@ -93,7 +96,10 @@ void MediaPlayerClient::LoadCommon() {
 
   if (resourceRequestor_) {
     resourceRequestor_->registerUMSPolicyActionCallback([this]() {
-      NotifyFunction(NOTIFY_ERROR, GMP_ERROR_RES_ALLOC, nullptr, nullptr);
+      base::error_t error;
+      error.errorCode = GMP_ERROR_RES_ALLOC;
+      error.errorText = "Resource Alloc Error";
+      NotifyFunction(NOTIFY_ERROR, GMP_ERROR_RES_ALLOC, nullptr, static_cast<void*>(&error));
       if (!NotifyBackground())
         GMP_DEBUG_PRINT("NotifyBackground fails");
     });
