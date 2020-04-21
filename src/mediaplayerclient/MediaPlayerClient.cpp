@@ -24,6 +24,21 @@
 
 namespace gmp { namespace player {
 
+// static
+bool MediaPlayerClient::IsCodecSupported(GMP_VIDEO_CODEC videoCodec) {
+  switch(videoCodec) {
+    case GMP_VIDEO_CODEC_H264:
+      return true;
+    case GMP_VIDEO_CODEC_VP8:
+      return false;
+    case GMP_VIDEO_CODEC_VP9:
+      return false;
+    default:
+      break;
+  }
+  return false;
+}
+
 MediaPlayerClient::MediaPlayerClient(const std::string& appId, const std::string& connectionId)
   : appId_(appId)
   , connectionId_(connectionId) {

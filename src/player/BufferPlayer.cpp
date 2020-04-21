@@ -960,6 +960,11 @@ bool BufferPlayer::AddVideoParserElement() {
       GMP_DEBUG_PRINT("H265 Parser");
       videoParser_ = gst_element_factory_make("h265parse", "h265-parse");
       break;
+    case GMP_VIDEO_CODEC_VP8:
+    case GMP_VIDEO_CODEC_VP9:
+      GMP_DEBUG_PRINT("Parser not needed for video codec[%d]",
+                      loadData_->videoCodec);
+      return true;
     default:
       GMP_DEBUG_PRINT("Video codec[%d] not supported", loadData_->videoCodec);
       return false;
@@ -989,6 +994,14 @@ bool BufferPlayer::AddVideoDecoderElement() {
     case GMP_VIDEO_CODEC_H265:
       GMP_DEBUG_PRINT("H265 Decoder");
       videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-h265");
+      break;
+    case GMP_VIDEO_CODEC_VP8:
+      GMP_DEBUG_PRINT("VP8 Decoder");
+      videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-vp8");
+      break;
+    case GMP_VIDEO_CODEC_VP9:
+      GMP_DEBUG_PRINT("VP9 Decoder");
+      videoDecoder_ = pf::ElementFactory::Create("custom", "video-codec-vp9");
       break;
     default:
       GMP_DEBUG_PRINT("Video codec[%d] not supported", loadData_->videoCodec);
@@ -1544,6 +1557,41 @@ void BufferPlayer::SetDecoderSpecificInfomation() {
       gst_pad_use_fixed_caps(srcPad);
       gst_object_unref(srcPad);
       gst_caps_unref(caps);
+    }
+  }
+
+  if (videoSrcInfo_ && videoSrcInfo_->pSrcElement) {
+    GstCaps* videoSrcCaps = NULL;
+    switch (loadData_->videoCodec) {
+      case GMP_VIDEO_CODEC_VP8: {
+        videoSrcCaps = gst_caps_new_simple("video/x-vp8",
+                                           "format", G_TYPE_STRING, "vp8",
+                                           "container", G_TYPE_STRING, "ES",
+                                           NULL );
+        break;
+      }
+      case GMP_VIDEO_CODEC_VP9: {
+        videoSrcCaps = gst_caps_new_simple("video/x-vp9",
+                                           "format", G_TYPE_STRING, "vp9",
+                                           "container", G_TYPE_STRING, "ES",
+                                           NULL );
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (videoSrcCaps != NULL) {
+      // FIXME : After implementing VP9 parser, it will be collected
+      gst_caps_set_simple(videoSrcCaps, "width", G_TYPE_INT, 1920,
+                                        "height", G_TYPE_INT, 1080,
+                          NULL);
+      GstPad *srcPad =
+          gst_element_get_static_pad(videoSrcInfo_->pSrcElement, "src");
+      gst_pad_set_caps(srcPad, videoSrcCaps);
+      gst_pad_use_fixed_caps(srcPad);
+      gst_object_unref(srcPad);
+      gst_caps_unref(videoSrcCaps);
     }
   }
 }
