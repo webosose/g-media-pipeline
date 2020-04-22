@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2020 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,6 +67,11 @@ struct source_info_t {
   std::vector<program_info_t> programs;
   std::vector<video_info_t> video_streams;
   std::vector<audio_info_t> audio_streams;
+
+  source_info_t()
+  :container(""), duration(-1),
+   seekable(true), programs(),
+   video_streams(),audio_streams() {}
 };
 
 struct result_t {

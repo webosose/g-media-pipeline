@@ -405,8 +405,8 @@ exit:
 bool testSurfaceWithGST(LSM::Connector &connector, int display_mode)
 {
 	GstElement *pipeline, *source, *demuxer, *parser, *decoder, *sink;
-	GMainLoop *loop;
-	
+	GMainLoop *loop = nullptr;
+
 	bool usePlaybin = true;
 	bool result = false;
 
@@ -418,7 +418,7 @@ bool testSurfaceWithGST(LSM::Connector &connector, int display_mode)
     }
 
 	if (usePlaybin)
-		pipeline = gst_element_factory_make("playbin", "playbin");	
+		pipeline = gst_element_factory_make("playbin", "playbin");
 	else
 		pipeline = gst_pipeline_new(nullptr);
 
