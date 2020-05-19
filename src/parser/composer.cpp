@@ -27,12 +27,13 @@ pbnjson::JValue to_json(const base::result_t & result) {
 
 template<>
 pbnjson::JValue to_json(const base::video_info_t & info) {
-  return pbnjson::JObject{{"codec", info.codec},
+  return pbnjson::JObject {{"video",
+      pbnjson::JObject{{"codec", info.codec},
                        {"bitrate", (int64_t)info.bit_rate},
                        {"width", (int32_t)info.width},
                        {"height", (int32_t)info.height},
                        {"frame_rate", pbnjson::JObject {{"num", info.frame_rate.num},
-                                                        {"den", info.frame_rate.den}}}};
+                                                        {"den", info.frame_rate.den}}}}}};
 }
 
 template<>
