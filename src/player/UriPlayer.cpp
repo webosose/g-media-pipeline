@@ -228,16 +228,16 @@ bool UriPlayer::Seek(const int64_t msecond) {
 bool UriPlayer::SetVolume(int volume) {
   GMP_DEBUG_PRINT("SetVolume: volume(%d)", volume);
 
-  if (!pipeline_) {
-    GMP_DEBUG_PRINT("pipeline is null");
-    return false;
-  }
+  pbnjson::JValue jsonValue = pbnjson::Object();
+  jsonValue.put("volume", pbnjson::JValue(volume));
+  std::string jsonStr = jsonValue.stringify();
 
-  if (volume < 0)
-    volume = 0;
+  const std::string uri = "luna://com.webos.service.audio/media/setVolume";
+  ResponseHandler nullcb;
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+                         : false;
 
-  g_object_set(G_OBJECT(pipeline_), "volume", (gdouble) (volume / 100.0), NULL);
-  return true;
+  return ret;
 }
 
 bool UriPlayer::GetSourceInfo() {
