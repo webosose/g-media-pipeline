@@ -145,6 +145,7 @@ class BufferPlayer : public AbstractPlayer {
 
     bool recEndOfStream_ = false;
     bool feedPossible_ = false;
+    bool shouldSetNewBaseTime_ = false;
 
     guint64 currentPts_ = 0;
     PIPELINE_STATE currentState_ = STOPPED_STATE;
@@ -154,6 +155,8 @@ class BufferPlayer : public AbstractPlayer {
     gmp::base::video_info_t videoInfo_;
     gmp::base::source_info_t sourceInfo_;
     gchar* inputDumpFileName = nullptr;
+
+    GstSegment segment_;
 };
 
 }  // namespace player

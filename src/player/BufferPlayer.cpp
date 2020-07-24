@@ -117,13 +117,47 @@ bool BufferPlayer::Play() {
     return false;
   }
 
+  if (shouldSetNewBaseTime_) {
+    gint64 position = 0;
+    gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
+    GMP_INFO_PRINT("position = %ld", position);
+
+    segment_.start = position;
+    segment_.time = position;
+    segment_.position = position;
+
+    if (videoSink_) {
+      GstEvent *event;
+      GstStructure *s;
+
+      s = gst_structure_new ("prepare-seamless-seek",
+          "segment-info", GST_TYPE_SEGMENT, &segment_,
+          "reset-start-time", G_TYPE_BOOLEAN, TRUE,
+          "update-base-time", G_TYPE_BOOLEAN, FALSE,
+          "new-base-time", GST_TYPE_CLOCK_TIME, GST_CLOCK_TIME_NONE,
+          "propagate", G_TYPE_BOOLEAN, TRUE, NULL);
+      event = gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM, s);
+      GMP_INFO_PRINT("Sending prepare-seamless-seek event to videosink");
+      gst_element_send_event (videoSink_, event);
+    }
+    if (audioSink_) {
+      GstEvent *event;
+      GstStructure *s;
+
+      s = gst_structure_new ("prepare-seamless-seek",
+          "segment-info", GST_TYPE_SEGMENT, &segment_,
+          "reset-start-time", G_TYPE_BOOLEAN, TRUE,
+          "update-base-time", G_TYPE_BOOLEAN, FALSE,
+          "new-base-time", GST_TYPE_CLOCK_TIME, GST_CLOCK_TIME_NONE,
+          "propagate", G_TYPE_BOOLEAN, TRUE, NULL);
+      event = gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM, s);
+      GMP_INFO_PRINT("Sending prepare-seamless-seek event to audiosink");
+      gst_element_send_event (audioSink_, event);
+    }
+    shouldSetNewBaseTime_ = false;
+  }
   if (load_complete_) {
     feedPossible_ = true;
-
-    if (seeking_) {
-      GMP_DEBUG_PRINT("Pipeline is in seeking state");
-      return false;
-    }
 
     GMP_INFO_PRINT("currentState_ [ %d ]", currentState_);
     if (currentState_== PLAYING_STATE)
@@ -188,30 +222,74 @@ bool BufferPlayer::SetPlayRate(const double rate) {
   }
 
   play_rate_ = rate;
-  seeking_ = true;
 
-  gmp::base::time_t position = 0;
+  gint64 position = 0;
   gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
-  GMP_DEBUG_PRINT("rate: %lf, position: %ld, duration: %ld",
+  GMP_INFO_PRINT("rate: %lf, position: %ld, duration: %ld",
                    rate, position, duration_);
 
-  if (rate > 0.0) {
-    if (!gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
-                     GstSeekFlags(GST_SEEK_FLAG_FLUSH |
-                                  GST_SEEK_FLAG_KEY_UNIT |
-                                  GST_SEEK_FLAG_TRICKMODE),
-                     GST_SEEK_TYPE_SET, position, GST_SEEK_TYPE_END, duration_))
-      GMP_INFO_PRINT("Set Playback Rate failed");
-  } else {
-    // reverse playback might be unsupported with some demuxer(e.g. qtdemxer)
-    gst_element_seek(pipeline_, (gdouble)rate, GST_FORMAT_TIME,
-                     GstSeekFlags(GST_SEEK_FLAG_FLUSH |
-                                  GST_SEEK_FLAG_KEY_UNIT |
-                                  GST_SEEK_FLAG_TRICKMODE |
-                                  GST_SEEK_FLAG_TRICKMODE_KEY_UNITS |
-                                  GST_SEEK_FLAG_TRICKMODE_NO_AUDIO),
-                     GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_SET, position);
+  gint64 currentPlayPosition = 0;
+  GstState curState = GST_STATE_NULL;
+  GstClockTime newBaseTime = GST_CLOCK_TIME_NONE;
+  gboolean reset_start_time = FALSE;
+  gboolean update_base_time = FALSE;
+  gboolean propagate = FALSE;
+
+  if (gst_element_get_state(pipeline_, &curState, NULL, 0) == GST_STATE_CHANGE_FAILURE) {
+    GMP_INFO_PRINT("fail to get pipeline state");
   }
+  GMP_INFO_PRINT("Current state : %d", curState);
+
+  segment_.start = position;
+  segment_.time = position;
+  segment_.position = position;
+  segment_.applied_rate = segment_.rate;
+  segment_.rate = rate;
+
+  if (curState == GST_STATE_PLAYING) {
+    newBaseTime = gst_pipeline_get_base_time ((GstPipeline *) pipeline_, /*start-time*/0);
+    reset_start_time = TRUE;
+    update_base_time = TRUE;
+    propagate = TRUE;
+  } else {
+    newBaseTime = GST_CLOCK_TIME_NONE;
+    reset_start_time = TRUE;
+    update_base_time = FALSE;
+    propagate = TRUE;
+  }
+
+  if (videoSink_) {
+    GstEvent *event;
+    GstStructure *s;
+    s = gst_structure_new ("prepare-seamless-seek",
+        "segment-info", GST_TYPE_SEGMENT, &segment_,
+        "reset-start-time", G_TYPE_BOOLEAN, reset_start_time,
+        "update-base-time", G_TYPE_BOOLEAN, update_base_time,
+        "new-base-time", GST_TYPE_CLOCK_TIME, newBaseTime,
+        "propagate", G_TYPE_BOOLEAN, propagate, NULL);
+
+    event = gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM, s);
+    GMP_INFO_PRINT("Sending prepare-seamless-seek event to videosink : %p", pipeline_);
+
+    gst_element_send_event (videoSink_, event);
+  }
+
+  if (audioSink_) {
+    GstEvent *event;
+    GstStructure *s;
+
+    s = gst_structure_new ("prepare-seamless-seek",
+        "segment-info", GST_TYPE_SEGMENT, &segment_,
+        "reset-start-time", G_TYPE_BOOLEAN, reset_start_time,
+        "update-base-time", G_TYPE_BOOLEAN, update_base_time,
+        "new-base-time", GST_TYPE_CLOCK_TIME, newBaseTime,
+        "propagate", G_TYPE_BOOLEAN, propagate, NULL);
+
+    event = gst_event_new_custom (GST_EVENT_CUSTOM_UPSTREAM, s);
+    GMP_INFO_PRINT("Sending prepare-seamless-seek event to audiosink : %p", pipeline_);
+    gst_element_send_event (audioSink_, event);
+  }
+  shouldSetNewBaseTime_ = true;
   return true;
 }
 
@@ -287,6 +365,7 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
     GMP_DEBUG_PRINT("CreatePipeline Failed");
     return false;
   }
+  gst_segment_init(&segment_, GST_FORMAT_TIME);
 
   if (!PauseInternal()) {
     GMP_INFO_PRINT("Failed to pause !!!");
@@ -779,8 +858,10 @@ bool BufferPlayer::AddAudioParserElement() {
   GMP_DEBUG_PRINT("Create and add audio parser element");
 
   audioPQueue_ = gst_element_factory_make("queue", "audio-parser-queue");
-  if (audioPQueue_)
-    SetQueueBufferSize(audioPQueue_, QUEUE_MAX_SIZE, 0);
+  if (audioPQueue_) {
+    GMP_DEBUG_PRINT("Audio parser queue created");
+    SetQueueBufferSize(audioPQueue_, 0, 3);
+  }
 
   if (!AddAndLinkElement(audioPQueue_)) {
     GMP_DEBUG_PRINT("Failed to add & link audio parser queue element");
@@ -934,8 +1015,9 @@ bool BufferPlayer::AddVideoParserElement() {
   GMP_DEBUG_PRINT("Create and add video parser elements");
 
   videoPQueue_ = gst_element_factory_make("queue", "video-parser-queue");
-  if (videoPQueue_)
-    SetQueueBufferSize(videoPQueue_, QUEUE_MAX_SIZE, 0);
+  if (videoPQueue_) {
+    SetQueueBufferSize(videoPQueue_, 0, 3);
+  }
 
   if (!AddAndLinkElement(videoPQueue_)) {
     GMP_DEBUG_PRINT("Failed to add and link video parser queue element");
