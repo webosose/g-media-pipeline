@@ -356,7 +356,7 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
     return false;
   }
 
-  if (!attachSurface()) {
+  if (!attachSurface(loadData_->videoCodec == GMP_VIDEO_CODEC_NONE)) {
     GMP_DEBUG_PRINT("attachSurface() failed");
     return false;
   }
