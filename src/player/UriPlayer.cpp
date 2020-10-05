@@ -230,6 +230,7 @@ bool UriPlayer::SetVolume(int volume) {
 
   pbnjson::JValue jsonValue = pbnjson::Object();
   jsonValue.put("volume", pbnjson::JValue(volume));
+  jsonValue.put("sessionId", pbnjson::JValue((int)display_path_));
   std::string jsonStr = jsonValue.stringify();
 
   const std::string uri = "luna://com.webos.service.audio/media/setVolume";

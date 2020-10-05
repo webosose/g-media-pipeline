@@ -315,10 +315,11 @@ bool BufferPlayer::Seek(const int64_t msecond) {
 }
 
 bool BufferPlayer::SetVolume(int volume) {
-  GMP_INFO_PRINT("SetVolume : volume %d", volume);
+  GMP_INFO_PRINT("SetVolume : volume = %d sessionId = %d", volume, display_path_);
 
   pbnjson::JValue jsonValue = pbnjson::Object();
   jsonValue.put("volume", pbnjson::JValue(volume));
+  jsonValue.put("sessionId", pbnjson::JValue((int)display_path_));
   std::string jsonStr = jsonValue.stringify();
 
   const std::string uri = "luna://com.webos.service.audio/media/setVolume";
