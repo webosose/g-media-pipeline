@@ -37,22 +37,35 @@ typedef int64_t time_t;   // time in milliseconds
 struct rational_t {
   int32_t num;
   int32_t den;
+
+  rational_t()
+  :num(0), den(1) {}
 };
 
 struct stream_info_t {
   int32_t codec;
   uint64_t bit_rate;
+
+  stream_info_t()
+  :codec(0), bit_rate(0) {}
 };
 
 struct video_info_t : stream_info_t {
   uint32_t width;
   uint32_t height;
   rational_t frame_rate;
+
+  video_info_t()
+  :width(0), height(0),
+   frame_rate() {}
 };
 
 struct audio_info_t : stream_info_t {
   int32_t channels;
   uint32_t sample_rate;
+
+  audio_info_t()
+  :channels(0), sample_rate(0) {}
 };
 
 struct program_info_t {

@@ -272,8 +272,7 @@ bool UriPlayer::GetSourceInfo() {
     video_stream_info.bit_rate = gst_discoverer_video_info_get_bitrate(video);
     video_stream_info.frame_rate.num = gst_discoverer_video_info_get_framerate_num(video);
     video_stream_info.frame_rate.den = gst_discoverer_video_info_get_framerate_denom(video);
-
-    GMP_DEBUG_PRINT("[video info] width: %d, height: %d, bitRate: %lu, frameRate: %d/%d",
+    GMP_DEBUG_PRINT("[video info] width: %d, height: %d, bitRate : %" PRIu64 ", frameRate: %d/%d",
                    video_stream_info.width,
                    video_stream_info.height,
                    video_stream_info.bit_rate,
@@ -291,7 +290,7 @@ bool UriPlayer::GetSourceInfo() {
     audio_stream_info.bit_rate = gst_discoverer_audio_info_get_bitrate(audio);
     audio_stream_info.sample_rate
       = gst_discoverer_audio_info_get_sample_rate(audio);
-    GMP_DEBUG_PRINT("[audio info] bitRate: %lu, sampleRate: %d",
+    GMP_DEBUG_PRINT("[audio info] bitRate: %" PRIu64, "sampleRate: %d",
                    audio_stream_info.bit_rate,
                    audio_stream_info.sample_rate);
   } else {
@@ -312,7 +311,7 @@ bool UriPlayer::GetSourceInfo() {
 
   GMP_DEBUG_PRINT("Width: : %d", video_stream_info.width);
   GMP_DEBUG_PRINT("Height: : %d", video_stream_info.height);
-  GMP_DEBUG_PRINT("Duration: : %lu", duration);
+  GMP_DEBUG_PRINT("Duration: :%" PRIu64, duration);
 
   g_clear_error(&err);
   gst_discoverer_stream_info_list_free(video_info);

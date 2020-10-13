@@ -47,6 +47,13 @@ struct videoResData_t {
 
   int parWidth;  // pixel-aspect-ratio width
   int parHeight; // pixel-aspect-ratio height
+
+  videoResData_t()
+  :vcodec(GMP_VIDEO_CODEC_NONE),
+   width(0), height(0),
+   frameRate(0), escanType(0),
+   e3DType(0),parWidth(0),
+   parHeight(0) {}
 };
 
 struct audioResData_t {
@@ -54,6 +61,10 @@ struct audioResData_t {
 
   int version;
   int channel;
+
+  audioResData_t()
+  :acodec(GMP_AUDIO_CODEC_NONE),
+   version(0), channel(0) {}
 };
 
 

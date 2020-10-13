@@ -82,6 +82,18 @@ BufferPlayer::BufferPlayer() {
 
   SetDebugDumpFileName();
 
+  segment_.flags = GST_SEGMENT_FLAG_NONE;
+  segment_.rate = 0;
+  segment_.applied_rate = 0;
+  segment_.format = GST_FORMAT_UNDEFINED;
+  segment_.base = 0;
+  segment_.offset = 0;
+  segment_.start = 0;
+  segment_.stop = 0;
+  segment_.time = 0;
+  segment_.position = 0;
+  segment_.duration = 0;
+
   GMP_INFO_PRINT("END");
 }
 
@@ -120,7 +132,7 @@ bool BufferPlayer::Play() {
   if (shouldSetNewBaseTime_) {
     gint64 position = 0;
     gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
-    GMP_INFO_PRINT("position = %ld", position);
+    GMP_INFO_PRINT("position = %" PRId64, position);
 
     segment_.start = position;
     segment_.time = position;
@@ -204,7 +216,7 @@ bool BufferPlayer::Pause() {
 }
 
 bool BufferPlayer::SetPlayRate(const double rate) {
-  GMP_INFO_PRINT("SetPlayRate: %lf", rate);
+  GMP_INFO_PRINT("SetPlayRate: %f", rate);
   std::lock_guard<std::recursive_mutex> lock(recursive_mutex_);
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline handle is NULL");
@@ -225,7 +237,7 @@ bool BufferPlayer::SetPlayRate(const double rate) {
 
   gint64 position = 0;
   gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
-  GMP_INFO_PRINT("rate: %lf, position: %ld, duration: %ld",
+  GMP_INFO_PRINT("rate: %f, position: %" PRId64, "duration: %" PRId64,
                    rate, position, duration_);
 
   gint64 currentPlayPosition = 0;
@@ -295,7 +307,7 @@ bool BufferPlayer::SetPlayRate(const double rate) {
 
 bool BufferPlayer::Seek(const int64_t msecond) {
   std::lock_guard<std::recursive_mutex> lock(recursive_mutex_);
-  GMP_INFO_PRINT("Seek: %ld", msecond);
+  GMP_INFO_PRINT("seek: %" PRId64, msecond);
 
   if (!pipeline_) {
     GMP_DEBUG_PRINT("pipeline handle is NULL");
@@ -1299,7 +1311,7 @@ bool BufferPlayer::PauseInternal() {
 }
 
 bool BufferPlayer::SeekInternal(const int64_t msecond) {
-  GMP_DEBUG_PRINT("seek pos [ %ld ]", msecond);
+  GMP_DEBUG_PRINT("seek pos: %" PRId64, msecond);
 
   if (!pipeline_ || currentState_ == STOPPED_STATE || !load_complete_)
     return false;
@@ -1603,17 +1615,19 @@ void BufferPlayer::EnoughData(GstElement *gstAppSrc, gpointer userData) {
     pAppSrcInfo = player->audioSrcInfo_.get();
   }
 
-  if ((pAppSrcInfo->needFeedData != CUSTOM_BUFFER_FULL) &&
-      (pAppSrcInfo->needFeedData != CUSTOM_BUFFER_LOCKED)) {
-    guint64 currBufferSize = 0;
-    g_object_get(G_OBJECT(gstAppSrc),
+  if (pAppSrcInfo) {
+    if ((pAppSrcInfo->needFeedData != CUSTOM_BUFFER_FULL) &&
+        (pAppSrcInfo->needFeedData != CUSTOM_BUFFER_LOCKED)) {
+      guint64 currBufferSize = 0;
+      g_object_get(G_OBJECT(gstAppSrc),
                  "current-level-bytes", &currBufferSize, NULL);
-    GMP_DEBUG_PRINT("currBufferSize [ %" G_GUINT64_FORMAT " ]", currBufferSize);
+      GMP_DEBUG_PRINT("currBufferSize [ %" G_GUINT64_FORMAT " ]", currBufferSize);
 
-    pAppSrcInfo->needFeedData = CUSTOM_BUFFER_FULL;
+      pAppSrcInfo->needFeedData = CUSTOM_BUFFER_FULL;
 
-    if (pAppSrcInfo == player->videoSrcInfo_.get() && player->cbFunction_)
-      player->cbFunction_(NOTIFY_BUFFER_FULL, dataChType, nullptr, nullptr);
+      if (pAppSrcInfo == player->videoSrcInfo_.get() && player->cbFunction_)
+        player->cbFunction_(NOTIFY_BUFFER_FULL, dataChType, nullptr, nullptr);
+    }
   }
 }
 

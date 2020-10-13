@@ -50,6 +50,7 @@ typedef enum {
 } NOTIFY_TYPE_T;
 
 typedef enum {
+  GMP_PLAYER_TYPE_NONE = -1,
   GMP_PLAYER_TYPE_URI = 0,
   GMP_PLAYER_TYPE_BUFFER,
   GMP_PLAYER_TYPE_EXT,

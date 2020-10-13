@@ -41,7 +41,8 @@ bool MediaPlayerClient::IsCodecSupported(GMP_VIDEO_CODEC videoCodec) {
 
 MediaPlayerClient::MediaPlayerClient(const std::string& appId, const std::string& connectionId)
   : appId_(appId)
-  , connectionId_(connectionId) {
+  , connectionId_(connectionId)
+  , playerType_(GMP_PLAYER_TYPE_NONE) {
   GMP_DEBUG_PRINT("appId: %s, connectionId: %s", appId.c_str(), connectionId.c_str());
 
   if (appId.empty())
