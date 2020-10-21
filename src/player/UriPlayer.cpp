@@ -290,7 +290,7 @@ bool UriPlayer::GetSourceInfo() {
     audio_stream_info.bit_rate = gst_discoverer_audio_info_get_bitrate(audio);
     audio_stream_info.sample_rate
       = gst_discoverer_audio_info_get_sample_rate(audio);
-    GMP_DEBUG_PRINT("[audio info] bitRate: %" PRIu64, "sampleRate: %d",
+    GMP_DEBUG_PRINT("[audio info] bitRate: %" PRIu64 "sampleRate: %d",
                    audio_stream_info.bit_rate,
                    audio_stream_info.sample_rate);
   } else {

@@ -237,7 +237,7 @@ bool BufferPlayer::SetPlayRate(const double rate) {
 
   gint64 position = 0;
   gst_element_query_position(pipeline_, GST_FORMAT_TIME, &position);
-  GMP_INFO_PRINT("rate: %f, position: %" PRId64, "duration: %" PRId64,
+  GMP_INFO_PRINT("rate: %f, position: %" PRId64 "duration: %" PRId64,
                    rate, position, duration_);
 
   gint64 currentPlayPosition = 0;
