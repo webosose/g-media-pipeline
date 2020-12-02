@@ -19,6 +19,7 @@ configure_file(sysbus/com.webos.g-media-pipeline.role.json.in sysbus/com.webos.g
 configure_file(sysbus/com.webos.g-media-pipeline.service.in sysbus/com.webos.g-media-pipeline.service @ONLY)
 configure_file(sysbus/com.webos.g-media-pipeline.api.json sysbus/com.webos.g-media-pipeline.api.json @ONLY)
 configure_file(sysbus/com.webos.g-media-pipeline.perm.json sysbus/com.webos.g-media-pipeline.perm.json @ONLY)
+configure_file(sysbus/com.webos.g-media-pipeline.groups.json sysbus/com.webos.g-media-pipeline.groups.json @ONLY)
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/g-media-pipeline.manifest.json
     DESTINATION share/luna-service2/manifests.d/)
@@ -30,3 +31,5 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.api.
     DESTINATION share/luna-service2/api-permissions.d/)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.perm.json
     DESTINATION share/luna-service2/client-permissions.d/)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sysbus/com.webos.g-media-pipeline.groups.json
+    DESTINATION share/luna-service2/groups.d/)

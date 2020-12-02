@@ -1,0 +1,8 @@
+{
+    "allowedNames": [
+       "com.webos.pipeline*",
+       "com.webos.rm.client*"
+    ],
+    "mediapipeline.resourcemanagement":"oem",
+    "mediapipeline.operation":"oem"
+}
