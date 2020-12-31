@@ -1,8 +1,9 @@
 {
     "com.webos.pipeline*": [
-        "media"
+        "audio.operation"
     ],
     "com.webos.rm.client*": [
-        "media"
+        "audio.operation",
+        "media.operation"
     ]
 }
