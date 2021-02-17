@@ -4,6 +4,7 @@
     ],
     "com.webos.rm.client*": [
         "audio.operation",
-        "media.operation"
+        "media.operation",
+        "media.query"
     ]
 }
