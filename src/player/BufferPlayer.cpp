@@ -336,7 +336,7 @@ bool BufferPlayer::SetVolume(int volume) {
 
   const std::string uri = "luna://com.webos.service.audio/media/setVolume";
 
-  ResponseHandler nullcb;
+  ResponseHandler nullcb = nullptr;
   bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
                    : false;
 
