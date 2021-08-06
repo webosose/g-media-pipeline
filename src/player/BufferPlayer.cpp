@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020 LG Electronics, Inc.
+// Copyright (c) 2018-2021 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -259,7 +259,11 @@ bool BufferPlayer::SetPlayRate(const double rate) {
   segment_.rate = rate;
 
   if (curState == GST_STATE_PLAYING) {
+#ifdef PLATFORM_QEMUX86
+    newBaseTime = gst_element_get_base_time (pipeline_);
+#else
     newBaseTime = gst_pipeline_get_base_time ((GstPipeline *) pipeline_, /*start-time*/0);
+#endif
     reset_start_time = TRUE;
     update_base_time = TRUE;
     propagate = TRUE;

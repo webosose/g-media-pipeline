@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019 LG Electronics, Inc.
+# Copyright (c) 2018-2021 LG Electronics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,6 +47,10 @@ set(GSTREAMER_LIBRARIES ${GSTPLAYER_LIBRARIES} ${GSTREAMER_LIBRARIES})
 
 include_directories(${GSTREAMER_INCLUDE_DIRS})
 link_directories(${GSTREAMER_LIBRARIES})
+
+if(${WEBOS_TARGET_MACHINE} STREQUAL "qemux86")
+    add_definitions(-DPLATFORM_QEMUX86)
+endif()
 
 add_subdirectory(src)
 add_subdirectory(files)
