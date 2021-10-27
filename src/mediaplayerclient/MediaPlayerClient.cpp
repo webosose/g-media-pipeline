@@ -371,7 +371,8 @@ void MediaPlayerClient::NotifyFunction(const gint cbType, const gint64 numValue,
     }
     case NOTIFY_ACQUIRE_RESOURCE: {
       ACQUIRE_RESOURCE_INFO_T* info = static_cast<ACQUIRE_RESOURCE_INFO_T*>(udata);
-      if (pf::ElementFactory::GetPlatform().find("qemux86") == std::string::npos)
+      if (pf::ElementFactory::GetPlatform().find("qemux86") == std::string::npos || 
+          pf::ElementFactory::GetPlatform().find("qemux86-64") == std::string::npos)
         info->result = AcquireResources(*(info->sourceInfo), info->displayMode, numValue);
       else
         info->result = true;
