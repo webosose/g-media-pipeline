@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,6 +108,10 @@ bool BufferPlayer::UnloadImpl() {
   videoSrcInfo_.reset();
 
   loadData_.reset();
+
+  if (!UnRegisterTrack()) {
+    GMP_DEBUG_PRINT("UnRegisterTrack failed ");
+  }
 
   DisconnectBusCallback();
 
@@ -335,10 +339,10 @@ bool BufferPlayer::SetVolume(int volume) {
 
   pbnjson::JValue jsonValue = pbnjson::Object();
   jsonValue.put("volume", pbnjson::JValue(volume));
-  jsonValue.put("sessionId", pbnjson::JValue((int)display_path_));
+  jsonValue.put("trackId", track_id_);
   std::string jsonStr = jsonValue.stringify();
 
-  const std::string uri = "luna://com.webos.service.audio/media/setVolume";
+  const std::string uri = "luna://com.webos.service.audio/setTrackVolume";
 
   ResponseHandler nullcb = [] (const char *){};
   bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
@@ -989,6 +993,12 @@ bool BufferPlayer::AddAudioSinkElement() {
   std::string aSinkName = (use_audio ? "audio-sink" : "fake-sink");
   audioSink_ = pf::ElementFactory::Create("custom", aSinkName,
                                           display_path_);
+
+  //set stream-properties for pulsesink
+  if (!RegisterTrack()) {
+    GMP_DEBUG_PRINT("RegisterTrack failed ");
+  }
+
   if (!AddAndLinkElement(audioSink_)) {
     GMP_DEBUG_PRINT("Failed to add & link audio sink element");
     return false;
@@ -1765,6 +1775,40 @@ void BufferPlayer::SetAppSrcProperties(MEDIA_SRC_T* pAppSrcInfo,
     GMP_DEBUG_PRINT("app src properties set for[ %s ]", srcReadName);
     g_free(srcReadName);
   }
+}
+
+bool BufferPlayer::RegisterTrack(){
+  std::string stream_type = pf::ElementFactory::streamtype[display_path_];
+
+  pbnjson::JValue jsonValue = pbnjson::Object();
+  jsonValue.put("streamType", stream_type);
+  std::string jsonStr = jsonValue.stringify();
+
+  const std::string uri = "luna://com.webos.service.audio/registerTrack";
+  ResponseHandler nullcb = [&] (const char *s){
+    pbnjson::JValue payload = pbnjson::JDomParser::fromString(s);
+    bool returnValue = payload["returnValue"].asBool();
+    track_id_ = payload["trackId"].asString();
+    GstStructure* structure = gst_structure_new("props", "application.name", G_TYPE_STRING, track_id_.c_str(), nullptr);
+    g_object_set(audioSink_, "stream-properties", structure, nullptr);
+    gst_structure_free(structure);
+  };
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+                         : false;
+  return ret;
+}
+
+bool BufferPlayer::UnRegisterTrack(){
+  pbnjson::JValue jsonValue = pbnjson::Object();
+
+  jsonValue.put("trackId", track_id_);
+  std::string jsonStr = jsonValue.stringify();
+
+  const std::string uri = "luna://com.webos.service.audio/unregisterTrack";
+  ResponseHandler nullcb = [] (const char *){};
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+                         : false;
+  return ret;
 }
 
 void BufferPlayer::SetDebugDumpFileName() {

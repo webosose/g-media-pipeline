@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,6 +39,11 @@ class UriPlayer : public AbstractPlayer {
   static gboolean NotifyCurrentTime(gpointer user_data);
   static gboolean NotifyBufferingTime(gpointer user_data);
 
+  /*for handling track volume*/
+  bool RegisterTrack();
+  bool UnRegisterTrack();
+
+
  protected:
   UriPlayer();
   void NotifySourceInfo();
@@ -65,6 +70,7 @@ class UriPlayer : public AbstractPlayer {
 
   /* buffering variable */
   GstElement *queue2_ = nullptr;
+  GstElement *aSink = nullptr;
   guint bufferingTimer_id_ = 0;
   bool buffering_ = false;
   bool buffering_time_updated_ = false;

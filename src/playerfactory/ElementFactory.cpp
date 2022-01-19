@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 namespace gmp { namespace pf {
 
 const char ElementFactory::gst_element_json_path[] = "/etc/g-media-pipeline/gst_elements.conf";
+std::string ElementFactory::streamtype[] = {""};
 
 GstElement * ElementFactory::Create(const std::string &pipelineType,
   const std::string &elementTypeName, uint32_t displayPath) {
@@ -50,6 +51,7 @@ GstElement * ElementFactory::Create(const std::string &pipelineType,
         && el[displayPath].isString()) {
         GMP_DEBUG_PRINT("Select device %d - name : %s",
           displayPath, el[displayPath].asString().c_str());
+        streamtype[displayPath] = el[displayPath].asString();
         SetProperty(element, "device", el[displayPath].asString());
       }
     }

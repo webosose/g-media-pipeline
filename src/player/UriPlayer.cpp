@@ -104,6 +104,10 @@ bool UriPlayer::UnloadImpl() {
   }
   current_position_ = 0;
 
+  if (!UnRegisterTrack()) {
+    GMP_DEBUG_PRINT("UnRegisterTrack failed ");
+  }
+
   SetPlayerState(base::playback_state_t::STOPPED);
 
   if (!detachSurface()) {
@@ -230,10 +234,10 @@ bool UriPlayer::SetVolume(int volume) {
 
   pbnjson::JValue jsonValue = pbnjson::Object();
   jsonValue.put("volume", pbnjson::JValue(volume));
-  jsonValue.put("sessionId", pbnjson::JValue((int)display_path_));
+  jsonValue.put("trackId", track_id_);
   std::string jsonStr = jsonValue.stringify();
 
-  const std::string uri = "luna://com.webos.service.audio/media/setVolume";
+  const std::string uri = "luna://com.webos.service.audio/setTrackVolume";
   ResponseHandler nullcb = [] (const char *){};
   bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
                          : false;
@@ -583,11 +587,17 @@ bool UriPlayer::LoadPipeline() {
   g_signal_connect(G_OBJECT(pipeline_), "element-setup", G_CALLBACK(elementSetupCB), this);
 
   std::string aSinkName = (use_audio ? "audio-sink" : "fake-sink");
-  GstElement *aSink = pf::ElementFactory::Create("playbin", aSinkName, display_path_);
+  aSink = pf::ElementFactory::Create("playbin", aSinkName, display_path_);
   if (!aSink ) {
     GMP_DEBUG_PRINT("ERROR : Cannot create audio sink element!");
     return false;
   }
+
+  //set stream-properties for pulsesink
+  if (!RegisterTrack()) {
+    GMP_DEBUG_PRINT("RegisterTrack failed ");
+  }
+
 
   GstElement *vSink = nullptr;
   GstElement *videoConvert =
@@ -830,6 +840,41 @@ int32_t UriPlayer::ConvertErrorCode(GQuark domain, gint code) {
   }
 
   return converted;
+}
+
+bool UriPlayer::RegisterTrack(){
+  std::string stream_type = pf::ElementFactory::streamtype[display_path_];
+
+  pbnjson::JValue jsonValue = pbnjson::Object();
+  jsonValue.put("streamType", stream_type);
+  std::string jsonStr = jsonValue.stringify();
+
+  const std::string uri = "luna://com.webos.service.audio/registerTrack";
+  ResponseHandler nullcb = [this] (const char *s){
+    pbnjson::JValue payload = pbnjson::JDomParser::fromString(s);
+    bool returnValue = payload["returnValue"].asBool();
+    this->track_id_ = payload["trackId"].asString();
+
+    GstStructure* structure = gst_structure_new("props", "application.name", G_TYPE_STRING, track_id_.c_str(), nullptr);
+    g_object_set(this->aSink, "stream-properties", structure, nullptr);
+    gst_structure_free(structure);
+  };
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+                         : false;
+  return ret;
+}
+
+bool UriPlayer::UnRegisterTrack(){
+  pbnjson::JValue jsonValue = pbnjson::Object();
+
+  jsonValue.put("trackId", track_id_);
+  std::string jsonStr = jsonValue.stringify();
+
+  const std::string uri = "luna://com.webos.service.audio/unregisterTrack";
+  ResponseHandler nullcb = [] (const char *){};
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+                         : false;
+  return ret;
 }
 
 void UriPlayer::ParseOptionString(const std::string &str) {

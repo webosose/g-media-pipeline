@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ class AbstractPlayer : public Player {
 
   base::source_info_t source_info_;
   uint32_t display_path_ = DEFAULT_DISPLAY;
+  std::string track_id_;
 
   double play_rate_ = 1.0;
   gint64 duration_ = 0;
