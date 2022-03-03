@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include <string>
 #include <memory>
 #include "player/PlayerTypes.h"
+#include "UriPlayerFactory.h"
 
 namespace gmp { namespace player { class Player; }}
 
@@ -33,6 +34,7 @@ class PlayerFactory {
 
   static std::shared_ptr<gmp::player::Player> CreatePlayer(const std::string &str, GMP_PLAYER_TYPE &playerType);
   static std::shared_ptr<gmp::player::Player> CreatePlayer(const MEDIA_LOAD_DATA_T*);
+  static std::string GetProtocolType(const std::string &uri);
 };
 
 }  // namespace pf

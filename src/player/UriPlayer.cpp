@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -662,7 +662,15 @@ bool UriPlayer::LoadPipeline() {
 
   gst_object_unref(bus);
   GMP_DEBUG_PRINT("LoadPipeline Done");
-  return gst_element_set_state(pipeline_, GST_STATE_PAUSED);
+  GstStateChangeReturn retVal = gst_element_set_state(pipeline_, GST_STATE_PAUSED);
+  if (retVal == GST_STATE_CHANGE_NO_PREROLL) {
+    GMP_DEBUG_PRINT(" NO_PREROLL - Live Streaming! Force to Play()");
+    if (!Play()) {
+      GMP_DEBUG_PRINT("ERROR : Failed to Play()");
+      return false;
+    }
+  }
+  return true;
 }
 
 gboolean UriPlayer::NotifyCurrentTime(gpointer user_data) {

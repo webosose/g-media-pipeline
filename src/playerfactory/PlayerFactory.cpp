@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2022 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include <regex>
 
 #include "PlayerFactory.h"
+#include "UriPlayerFactory.h"
 #include "log/log.h"
 
 #include "player/Player.h"
@@ -35,7 +36,7 @@ PlayerFactory::PlayerFactory() {}
 PlayerFactory::~PlayerFactory() {}
 
 std::shared_ptr<gmp::player::Player> PlayerFactory::CreatePlayer(const std::string &str, GMP_PLAYER_TYPE &playerType) {
-  std::shared_ptr<gmp::player::Player> player;
+  std::shared_ptr<gmp::player::Player> player = nullptr;
 
   pbnjson::JDomParser jdparser;
   if (!jdparser.parse(str, pbnjson::JSchema::AllSchema())) {
@@ -45,12 +46,18 @@ std::shared_ptr<gmp::player::Player> PlayerFactory::CreatePlayer(const std::stri
   pbnjson::JValue parsed = jdparser.getDom();
 
   if (parsed.hasKey("uri")) {
-    std::string uri_ = parsed["uri"].asString();
-    GMP_DEBUG_PRINT("uri = %s", uri_.c_str());
+    const std::string uri = parsed["uri"].asString();
+    GMP_INFO_PRINT("uri = %s", uri.c_str());
 
     playerType = GMP_PLAYER_TYPE_URI;
-    GMP_DEBUG_PRINT("Create UriPlainPlayer");
-    player = std::make_shared<gmp::player::UriPlainPlayer>();
+
+    std::string protocol = GetProtocolType(uri);
+    player = UriPlayerFactory::getInstance()->CreateUriTypePlayer(protocol);
+
+    if (!player) {
+      GMP_INFO_PRINT("Create UriPlainPlayer");
+      player = std::make_shared<gmp::player::UriPlainPlayer>();
+    }
   } else {
     GMP_INFO_PRINT("ERROR from CreatePlayer");
     return nullptr;
@@ -64,6 +71,17 @@ std::shared_ptr<gmp::player::Player> PlayerFactory::CreatePlayer(const MEDIA_LOA
   std::shared_ptr<gmp::player::Player> player;
   player = std::make_shared<gmp::player::BufferPlainPlayer>();
   return player;
+}
+
+std::string PlayerFactory::GetProtocolType(const std::string &uri) {
+  std::string protocolType;
+  const std::string prot_end("://");
+  std::string::const_iterator prot_i = search(uri.begin(), uri.end(),
+                                           prot_end.begin(), prot_end.end());
+  protocolType.reserve(distance(uri.begin(), prot_i));
+  transform(uri.begin(), prot_i,std::back_inserter(protocolType),
+              std::ptr_fun<int,int>(tolower));
+  return protocolType;
 }
 
 }  // namespace pf

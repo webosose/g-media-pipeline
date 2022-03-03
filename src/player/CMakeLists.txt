@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2020 LG Electronics, Inc.
+# Copyright (c) 2018-2022 LG Electronics, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,6 +84,7 @@ set(G-MEDIA-PIPELINE_HEADERS
     ../dsi/DSIGeneratorAAC.h
     ../playerfactory/ElementFactory.h
     ../playerfactory/PlayerFactory.h
+    ../playerfactory/UriPlayerFactory.h
     ../mediaplayerclient/MediaPlayerClient.h
     ../lunaserviceclient/LunaServiceClient.h
     )
@@ -92,6 +93,7 @@ set(G-MEDIA-PIPELINE_SRC
     AbstractPlayer.cpp
     UriPlayer.cpp
     UriPlainPlayer.cpp
+    RtpPlayer.cpp
     BufferPlayer.cpp
     BufferPlainPlayer.cpp
     ../log/log.cpp
@@ -104,6 +106,7 @@ set(G-MEDIA-PIPELINE_SRC
     ../dsi/DSIGeneratorFactory.cpp
     ../playerfactory/ElementFactory.cpp
     ../playerfactory/PlayerFactory.cpp
+    ../playerfactory/UriPlayerFactory.cpp
     ../mediaplayerclient/MediaPlayerClient.cpp
     ../lunaserviceclient/LunaServiceClient.cpp
     )
