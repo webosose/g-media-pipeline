@@ -134,8 +134,8 @@ bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMa
   string response;
 
   JValue objArray = pbnjson::Array();
-  for (auto option : finalOptions) {
-    for (auto it : option) {
+  for (auto const & option : finalOptions) {
+    for (auto const & it : option) {
       JValue obj = pbnjson::Object();
       obj.put("resource", it.type + (it.type == "DISP" ? to_string(display_path) : ""));
       obj.put("qty", it.quantity);
