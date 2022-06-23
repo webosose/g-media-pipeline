@@ -49,6 +49,7 @@ class UriRtpPlayer : public UriPlayer {
  GstElement *pVSinkElement_ = nullptr;
  GstElement *pASinkElement = nullptr;
  GstElement *pAConvertElement_ = nullptr;
+ GstElement *pVConvertElement_ = nullptr;
 
 };
 

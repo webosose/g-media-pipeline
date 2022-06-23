@@ -79,12 +79,19 @@ bool UriRtpPlayer::LoadPipeline() {
       GstPad *video_sinkpad;
       GstPadLinkReturn pad_return;
 
-      video_sinkpad = gst_element_get_static_pad (player->pVSinkElement_, "sink");
-      if (GST_PAD_IS_LINKED (video_sinkpad)) {
-        g_object_unref (video_sinkpad);
-        return;
+      if (player->pVConvertElement_) {
+        video_sinkpad = gst_element_get_static_pad (player->pVConvertElement_, "sink");
+        if (GST_PAD_IS_LINKED (video_sinkpad)) {
+          g_object_unref (video_sinkpad);
+          return;
+        }
+      } else {
+        video_sinkpad = gst_element_get_static_pad (player->pVSinkElement_, "sink");
+        if (GST_PAD_IS_LINKED (video_sinkpad)) {
+          g_object_unref (video_sinkpad);
+          return;
+        }        
       }
-
     /* link'n'play */
     pad_return = gst_pad_link (pad, video_sinkpad);
     if(pad_return != GST_PAD_LINK_OK) {
@@ -117,6 +124,8 @@ bool UriRtpPlayer::LoadPipeline() {
   g_signal_connect(pSrcElement_,"pad-added", G_CALLBACK(addDecoderCB),this);
   g_signal_connect(pDecElement_,"pad-added", G_CALLBACK(addSinkCB),this);
 
+
+  pVConvertElement_ = pf::ElementFactory::Create("custom", "video-converter");
   pVSinkElement_ = gst_element_factory_make("waylandsink", "waylandsink");
   if(!pVSinkElement_) {
     GMP_INFO_PRINT("ERROR : No waylandsink element !");
@@ -140,6 +149,14 @@ bool UriRtpPlayer::LoadPipeline() {
     return false;
   }
   gst_bin_add_many(GST_BIN(pipeline_),pSrcElement_, pDecElement_, pAConvertElement_, aSink, pVSinkElement_, NULL);
+  gst_bin_add(GST_BIN(pipeline_), pVConvertElement_);
+  if (pVConvertElement_) {
+    if (!gst_element_link(pVConvertElement_, pVSinkElement_)) {
+      GMP_INFO_PRINT("ERROR : Linking failed pVConvertElement_ -> pVSinkElement_ !" );
+      return false;
+    }
+  }
+
   if (!gst_element_link(pAConvertElement_, aSink)) {
     GMP_INFO_PRINT("ERROR : Linking failed pAConvertElement_ -> aSink !" );
     return false;
