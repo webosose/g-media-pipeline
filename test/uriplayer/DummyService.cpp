@@ -55,16 +55,20 @@ bool DummyService::Play()
 {
   if (media_player_client_)
     return media_player_client_->Play();
-  else
+  else {
+    std::cout << std::string("Load is not completed") << std::endl;
     return false;
+  }
 }
 
 bool DummyService::Pause()
 {
   if (media_player_client_)
     return media_player_client_->Pause();
-  else
+  else {
+    std::cout << std::string("Player should be in Playing state") << std::endl;
     return false;
+  }
 }
 
 bool DummyService::Seek(const std::string& param)
@@ -72,16 +76,20 @@ bool DummyService::Seek(const std::string& param)
   int64_t msec = std::stoi(param) * 1000;
   if (media_player_client_)
     return media_player_client_->Seek(msec);
-  else
+  else {
+    std::cout << std::string("Player should be in Playing state") << std::endl;
     return false;
+  }
 }
 
 bool DummyService::Unload()
 {
   if (media_player_client_)
     return media_player_client_->Unload();
-  else
+  else {
+    std::cout << std::string("Player is not loaded") << std::endl;
     return false;
+  }
 }
 
 void DummyService::Notify(const gint notification, const gint64 numValue, const gchar* strValue, void* payload)

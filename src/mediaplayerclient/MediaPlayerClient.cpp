@@ -54,7 +54,8 @@ MediaPlayerClient::MediaPlayerClient(const std::string& appId, const std::string
 MediaPlayerClient::~MediaPlayerClient() {
   GMP_DEBUG_PRINT("");
 
-  resourceRequestor_->setIsUnloading(true);
+  if (resourceRequestor_)
+    resourceRequestor_->setIsUnloading(true);
 
   if (isLoaded_) {
     GMP_DEBUG_PRINT("Unload() should be called if it is still loaded");

@@ -44,7 +44,7 @@ static bool doUnload(gmp::test::StreamSource& source,
                      const std::string& param = std::string());
 
 std::string window_id;
-std::string test_uri("http://10.178.84.247/mp4/sintel.mp4");
+std::string test_uri("http://10.178.84.247/mp4/1080p.mp4");
 
 enum class BufferPlayerAPI : int {
   LOAD = 1,

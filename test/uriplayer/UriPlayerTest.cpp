@@ -128,10 +128,15 @@ static bool processCommand(DummyService& service, const std::string& cmd)
       gmp::base::load_param_t param = { "Textured", 0, window_id, test_uri };
 
       std::string uri;
-      std::cout << "Enter uri(default->http://10.178.84.247/mp4/1080p.mp4): " << std::endl;
+      std::cout << "Enter uri Example : http://10.178.84.247/mp4/1080p.mp4" << std::endl;
       std::getline(std::cin, uri);
-      if (!uri.empty())
-        param.uri = uri;
+
+      if (uri.empty()) {
+          std::cout << "Uri is Empty, Please Enter Valid Uri " << std::endl;
+          return true;
+      } else {
+          param.uri = uri;
+      }
 
       composer.put(param);
       ret = iter->second(service, composer.result());
