@@ -226,6 +226,7 @@ bool StreamSource::Unload()
   if(media_player_client_) {
     return media_player_client_->Unload();
   }
+  return true;
 }
 
 bool StreamSource::MakeLoadData(int64_t start_time, MEDIA_LOAD_DATA_T* load_data)
