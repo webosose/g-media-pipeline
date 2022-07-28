@@ -132,6 +132,8 @@ class Parser {
         }
       } catch (std::regex_error& e) {
         GMP_DEBUG_PRINT("Syntax error in the regular expression");
+      } catch (const std::invalid_argument& ia) {
+        GMP_DEBUG_PRINT("Invalid argument for stoll");
       }
 
       if (start_time > 0)
