@@ -208,14 +208,14 @@ bool StreamSource::Seek(const std::string& pos)
 
   if (!gst_element_seek(pipeline_, 1.0, GST_FORMAT_TIME,
           GstSeekFlags(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
-          GST_SEEK_TYPE_SET, GST_TIME_AS_NSECONDS(sec),
+          GST_SEEK_TYPE_SET, GST_SECOND * (sec),
           GST_SEEK_TYPE_NONE, 0)) {
     std::cout << std::string("Seek failed!") << std::endl;
     return false;
   }
 
   if (media_player_client_)
-    return media_player_client_->Seek(GST_TIME_AS_MSECONDS(sec));
+    return media_player_client_->Seek(sec * 1000);
   else
     return false;
 }
