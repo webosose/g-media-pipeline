@@ -153,9 +153,9 @@ bool renderInitialize(struct wl_display *display, EGLData *eglData, WaylandEGLSu
     eglData->currentEglConfig = eglData->eglConfig[eglData->configSelect];
 
     EGLint ctx_attrib_list[3] = {
-        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_CONTEXT_CLIENT_VERSION, 3,
         EGL_NONE};
-    ctx_attrib_list[1] = 2; //Client Version.
+    ctx_attrib_list[1] = 3; //Client Version.
 
     eglData->eglContext = eglCreateContext(eglData->eglDisplay, eglData->eglConfig[eglData->configSelect], EGL_NO_CONTEXT, ctx_attrib_list);
 

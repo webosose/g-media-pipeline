@@ -42,7 +42,7 @@ bool UriRtpPlayer::LoadPipeline() {
     return false;
   }
   /*2. create decodebin*/
-  pDecElement_ = gst_element_factory_make("decodebin","decodebin");
+  pDecElement_ = gst_element_factory_make("decodebin3","decodebin3");
 
   if(!pDecElement_) {
     GMP_INFO_PRINT("ERROR : No decodebin element !");

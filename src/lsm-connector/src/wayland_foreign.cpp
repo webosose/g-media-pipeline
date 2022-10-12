@@ -25,7 +25,7 @@ static void display_handle_global(void *waylandData, struct wl_registry *registr
     auto foreign = (Wayland::Foreign *)waylandData;
 
     if (strcmp(interface, "wl_compositor") == 0) {
-        foreign->setCompositor((struct wl_compositor *)wl_registry_bind(registry, id, &wl_compositor_interface, 1));
+        foreign->setCompositor((struct wl_compositor *)wl_registry_bind(registry, id, &wl_compositor_interface, 4));
     } else if (strcmp(interface, "wl_shell") == 0) {
         foreign->setShell((struct wl_shell *)wl_registry_bind(registry, id, &wl_shell_interface, 1));
     } else if (strcmp(interface, "wl_webos_shell") == 0) {
