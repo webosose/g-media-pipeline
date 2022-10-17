@@ -38,6 +38,10 @@ class UriPlayer : public AbstractPlayer {
                                    GstMessage * msg, gpointer data);
   static gboolean NotifyCurrentTime(gpointer user_data);
   static gboolean NotifyBufferingTime(gpointer user_data);
+	/* Added for _DR_ resolution change event support */
+	//static gboolean SourceChangedData(GstElement* gstAppSrc, gint width, gint height, gint fps_num, gint fps_den,
+  static gboolean SourceChangedData(GstElement* pipeline, gint width, gint height, gint fps_num, gint fps_den,
+                             gpointer userData);
 
   /*for handling track volume*/
   bool RegisterTrack();

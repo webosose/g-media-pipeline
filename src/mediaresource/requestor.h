@@ -83,6 +83,7 @@ class ResourceRequestor {
   void registerPlaneIdCallback(PlaneIDFunctor callback) { planeIdCb_ = callback; }
 
   bool acquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);
+  bool reacquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);
 
   bool releaseResource();
 

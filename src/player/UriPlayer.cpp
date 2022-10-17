@@ -24,6 +24,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <gst/video/videooverlay.h>
+/* Added for _DR_ resolution change event support */
+#include <gst/codecparsers/gsth264parse.h>
 #include "ElementFactory.h"
 
 #include "parser/parser.h"
@@ -548,6 +550,37 @@ drop:
   return GST_BUS_DROP;
 }
 
+/* Added for _DR_ resolution change event support */
+gboolean UriPlayer::SourceChangedData(GstElement* gstAppSrc, gint width, gint height, gint fps_num, gint fps_den,
+                             gpointer userData) {
+  UriPlayer *player = reinterpret_cast<UriPlayer *>(userData);
+  gmp::base::video_info_t videoInfo;
+  gmp::base::source_info_t sourceInfo;
+  GMP_DEBUG_PRINT("SourceChangedData called from parser with res: %d %d", width, height);
+
+  ACQUIRE_RESOURCE_INFO_T resource_info;
+  videoInfo.width = width;
+  videoInfo.height = height;
+  videoInfo.frame_rate.num = fps_num;
+  videoInfo.frame_rate.den = fps_den;
+  sourceInfo.video_streams.push_back(videoInfo);
+  player->source_info_.video_streams.push_back(videoInfo);
+
+  resource_info.sourceInfo = &(sourceInfo);
+  resource_info.displayMode = const_cast<char*>(player->display_mode_.c_str());
+  resource_info.result = false;
+
+  for(int i = 0; i < player->source_info_.video_streams.size(); i++)
+  {
+	  GMP_DEBUG_PRINT("SourceChangedData source_info width[%d] and height[%d]: %d %d", i, i, player->source_info_.video_streams[i].width, player->source_info_.video_streams[i].height);
+  }
+  if (player->cbFunction_)
+	player->cbFunction_(NOTIFY_REACQUIRE_RESOURCE, player->display_path_, nullptr, static_cast<void*>(&resource_info));
+
+  return true;
+}
+/* Added for _DR_ resolution change event support */
+
 bool UriPlayer::LoadPipeline() {
   GMP_DEBUG_PRINT("LoadPipeline planeId:%d", planeId_);
 
@@ -580,6 +613,12 @@ bool UriPlayer::LoadPipeline() {
       g_object_set(element, "max-size-bytes", player->queue2MaxSizeBytes,
                             "max-size-time", player->queue2MaxSizeTime, NULL);
     }
+	else if (g_strrstr(name, "h264parse") != NULL) {
+      GMP_INFO_PRINT("%s h264parse!!! element setup, connecting to signal", name);
+      g_signal_connect(reinterpret_cast<GstH264Parse*>(element),
+                   "source-changed", G_CALLBACK(SourceChangedData), player);
+	}
+    /* Added for _DR_ resolution change event support */
     g_free(name);
   };
 

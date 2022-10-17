@@ -75,6 +75,8 @@ class MediaPlayerClient {
     bool SetPlaybackRate(const double playbackRate);
     bool AcquireResources(base::source_info_t &sourceInfo,
                             const std::string &display_mode = "Default", uint32_t display_path = 0);
+    bool ReacquireResources(base::source_info_t &sourceInfo,
+                            const std::string &display_mode = "Default", uint32_t display_path = 0);
     bool ReleaseResources();
     const char* GetMediaID();
     void NotifyFunction(const gint type, const gint64 numValue, const gchar *strValue, void *udata);
