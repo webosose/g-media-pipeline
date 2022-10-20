@@ -187,57 +187,6 @@ bool ResourceRequestor::releaseResource() {
   return true;
 }
 
-bool ResourceRequestor::reacquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path) {
-
-  // ResourceCaculator & ResourceManager is changed in WebOS 3.0
-  mrc::ResourceListOptions VResource;;
-  mrc::ResourceListOptions finalOptions;
-
-  // TODO(someone) : we have to set real width, hegith to videoResData
-
-  VResource = rc_->calcVdecResourceOptions((MRC::VideoCodecs)translateVideoCodec(videoResData_.vcodec),
-      videoResData_.width,
-      videoResData_.height,
-      videoResData_.frameRate,
-      (MRC::ScanType)translateScanType(videoResData_.escanType),
-      (MRC::_3DType)translate3DType(videoResData_.e3DType));
-  GMP_DEBUG_PRINT("VResource size:%lu, %s, %d",
-        VResource.size(), VResource[0].front().type.c_str(), VResource[0].front().quantity);
-  mrc::concatResourceListOptions(&finalOptions, &VResource);
-
-  JSchemaFragment input_schema("{}");
-  JGenerator serializer(nullptr);
-  string payload;
-  string response;
-
-  JValue objArray = pbnjson::Array();
-  for (auto const & option : finalOptions) {
-    for (auto const & it : option) {
-      JValue obj = pbnjson::Object();
-      obj.put("resource", it.type + (it.type == "DISP" ? to_string(display_path) : ""));
-      obj.put("qty", it.quantity);
-      GMP_DEBUG_PRINT("calculator return : %s, %d", it.type.c_str(), it.quantity);
-      objArray << obj;
-    }
-  }
-
-  if (!serializer.toString(objArray, input_schema, payload)) {
-    GMP_DEBUG_PRINT("[%s], fail to serializer to string", __func__);
-    return false;
-  }
-
-  GMP_DEBUG_PRINT("send reacquire to uMediaServer payload:%s", payload.c_str());
-
-  if (!umsRMC_->reacquire(payload, response)) {
-    GMP_DEBUG_PRINT("fail to reacquire!!! response : %s", response.c_str());
-    return false;
-  }
-  GMP_DEBUG_PRINT("reacquire response:%s", response.c_str());
-
-  GMP_DEBUG_PRINT("acquired Resource : %s", acquiredResource_.c_str());
-  return true;
-}
-
 bool ResourceRequestor::notifyForeground() const {
   return umsRMC_->notifyForeground();
 }
@@ -369,6 +318,7 @@ int ResourceRequestor::translateAudioCodec(const GMP_AUDIO_CODEC acodec) const {
   MRC::AudioCodec ea = MRC::kAudioEtc;
 
   switch (acodec) {
+    // currently webOS TV only considers "audio/mpeg" or not
     case GMP_AUDIO_CODEC_MP3:
       ea = MRC::kAudioMPEG;
       break;

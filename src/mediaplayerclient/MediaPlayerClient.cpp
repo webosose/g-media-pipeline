@@ -101,31 +101,6 @@ bool MediaPlayerClient::ReleaseResources() {
   return resourceRequestor_->releaseResource();
 }
 
-bool MediaPlayerClient::ReacquireResources(base::source_info_t &sourceInfo,
-                                        const std::string &display_mode, uint32_t display_path) {
-  GMP_DEBUG_PRINT("");
-  gmp::resource::PortResource_t resourceMMap;
-  gmp::base::disp_res_t dispRes = {-1,-1,-1};
-
-  if (resourceRequestor_) {
-    if (!resourceRequestor_->setSourceInfo(sourceInfo)) {
-      GMP_DEBUG_PRINT("set source info failed");
-      return false;
-    }
-
-    if (!resourceRequestor_->reacquireResources(nullptr, resourceMMap, display_mode, dispRes, display_path)) {
-      GMP_INFO_PRINT("resource acquisition failed");
-      return false;
-    }
-
-    for (auto it : resourceMMap) {
-      GMP_DEBUG_PRINT("Resource::[%s]=>index:%d", it.first.c_str(), it.second);
-    }
-  }
-
-  return true;
-}
-
 void MediaPlayerClient::LoadCommon() {
   if (!NotifyForeground())
     GMP_DEBUG_PRINT("NotifyForeground fails");
@@ -402,12 +377,6 @@ void MediaPlayerClient::NotifyFunction(const gint cbType, const gint64 numValue,
         info->result = AcquireResources(*(info->sourceInfo), info->displayMode, numValue);
       else
         info->result = true;
-      break;
-    }
-    case NOTIFY_REACQUIRE_RESOURCE: {
-        ACQUIRE_RESOURCE_INFO_T* info = static_cast<ACQUIRE_RESOURCE_INFO_T*>(udata);
-	    GMP_DEBUG_PRINT("NotifyFunction source_info width and height: %d %d", info->sourceInfo->video_streams[0].width, info->sourceInfo->video_streams[0].height);
-        info->result = ReacquireResources(*(info->sourceInfo), info->displayMode, numValue);
       break;
     }
     default: {
