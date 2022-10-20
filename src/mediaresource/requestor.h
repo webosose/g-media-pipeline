@@ -24,6 +24,7 @@
 #include <memory>
 #include <map>
 #include <dto_types.h>
+#include <pbnjson.hpp>
 
 #include "../player/PlayerTypes.h"
 
@@ -83,6 +84,7 @@ class ResourceRequestor {
   void registerPlaneIdCallback(PlaneIDFunctor callback) { planeIdCb_ = callback; }
 
   bool acquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);
+  bool reacquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);
 
   bool releaseResource();
 
@@ -110,7 +112,9 @@ class ResourceRequestor {
   void planeIdHandler(int32_t planePortIdx);
 
   bool parsePortInformation(const std::string& payload, PortResource_t& resourceMMap, gmp::base::disp_res_t & res);
-  bool parseResources(const std::string& payload, std::string& resources);
+  bool parseResources(const std::string& payload, std::string& adecResource, std::string& vdecResource, bool reacquireInfo);
+  std::string getResourceString(const pbnjson::JValue& parsed, const std::string& resource_type);
+  bool calcResources(const std::string &display_mode, const int32_t display_path, std::string &resourceString, bool reacquierInfo);
 
   // translate enum type from omx player to resource calculator
   int translateVideoCodec(const GMP_VIDEO_CODEC vcodec) const;
@@ -124,7 +128,8 @@ class ResourceRequestor {
   std::string connectionId_;
   Functor cb_;
   PlaneIDFunctor planeIdCb_;
-  std::string acquiredResource_;
+  std::string adecResource_;
+  std::string vdecResource_;
   videoResData_t videoResData_;
   audioResData_t audioResData_;
   ums::video_info_t video_info_;

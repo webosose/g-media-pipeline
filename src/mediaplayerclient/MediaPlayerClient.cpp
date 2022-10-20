@@ -101,6 +101,24 @@ bool MediaPlayerClient::ReleaseResources() {
   return resourceRequestor_->releaseResource();
 }
 
+bool MediaPlayerClient::ReacquireResources(base::source_info_t &sourceInfo,
+                                        const std::string &display_mode, uint32_t display_path) {
+  GMP_DEBUG_PRINT("");
+  gmp::resource::PortResource_t resourceMMap;
+  gmp::base::disp_res_t dispRes = {-1,-1,-1};
+
+  if (resourceRequestor_) {
+    if (!resourceRequestor_->setSourceInfo(sourceInfo)) {
+      GMP_DEBUG_PRINT("set source info failed");
+      return false;
+    }
+
+    return resourceRequestor_->reacquireResources(nullptr, resourceMMap, display_mode, dispRes, display_path);
+  }
+
+  return false;
+}
+
 void MediaPlayerClient::LoadCommon() {
   if (!NotifyForeground())
     GMP_DEBUG_PRINT("NotifyForeground fails");
@@ -372,9 +390,18 @@ void MediaPlayerClient::NotifyFunction(const gint cbType, const gint64 numValue,
     }
     case NOTIFY_ACQUIRE_RESOURCE: {
       ACQUIRE_RESOURCE_INFO_T* info = static_cast<ACQUIRE_RESOURCE_INFO_T*>(udata);
-      if (pf::ElementFactory::GetPlatform().find("qemux86") == std::string::npos || 
+      if (pf::ElementFactory::GetPlatform().find("qemux86") == std::string::npos ||
           pf::ElementFactory::GetPlatform().find("qemux86-64") == std::string::npos)
         info->result = AcquireResources(*(info->sourceInfo), info->displayMode, numValue);
+      else
+        info->result = true;
+      break;
+    }
+    case NOTIFY_REACQUIRE_RESOURCE: {
+      ACQUIRE_RESOURCE_INFO_T* info = static_cast<ACQUIRE_RESOURCE_INFO_T*>(udata);
+      if (pf::ElementFactory::GetPlatform().find("qemux86") == std::string::npos ||
+          pf::ElementFactory::GetPlatform().find("qemux86-64") == std::string::npos)
+        info->result = ReacquireResources(*(info->sourceInfo), info->displayMode, numValue);
       else
         info->result = true;
       break;

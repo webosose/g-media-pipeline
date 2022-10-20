@@ -21,7 +21,6 @@
 #include <utility>
 #include <cmath>
 #include <base/types.h>
-#include <pbnjson.hpp>
 #include <resource_calculator.h>
 #include <ResourceManagerClient.h>
 #include "mediaresource/requestor.h"
@@ -82,13 +81,10 @@ ResourceRequestor::ResourceRequestor(const std::string& appId, const std::string
 }
 
 ResourceRequestor::~ResourceRequestor() {
-  if (!acquiredResource_.empty()) {
-    umsRMC_->release(acquiredResource_);
-    acquiredResource_ = "";
-  }
+  releaseResource();
 }
 
-bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path) {
+bool ResourceRequestor::calcResources(const std::string &display_mode, const int32_t display_path, std::string &resourceString, bool reacquiereInfo) {
 
   // ResourceCaculator & ResourceManager is changed in WebOS 3.0
   mrc::ResourceList AResource;
@@ -99,39 +95,38 @@ bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMa
 
   // TODO(someone) : we have to set real width, hegith to videoResData
 
-  AResource = rc_->calcAdecResources((MRC::AudioCodecs)translateAudioCodec(audioResData_.acodec),
-      audioResData_.version,
-      audioResData_.channel);
-  mrc::concatResourceList(&audioOptions, &AResource);
-  GMP_DEBUG_PRINT("AResource size:%lu, %s, %d",
-        AResource.size(), AResource.front().type.c_str(), AResource.front().quantity);
-
-  VResource = rc_->calcVdecResourceOptions((MRC::VideoCodecs)translateVideoCodec(videoResData_.vcodec),
-      videoResData_.width,
-      videoResData_.height,
-      videoResData_.frameRate,
-      (MRC::ScanType)translateScanType(videoResData_.escanType),
-      (MRC::_3DType)translate3DType(videoResData_.e3DType));
-  GMP_DEBUG_PRINT("VResource size:%lu, %s, %d",
-        VResource.size(), VResource[0].front().type.c_str(), VResource[0].front().quantity);
-  finalOptions.push_back(audioOptions);
-  mrc::concatResourceListOptions(&finalOptions, &VResource);
-
-  if (display_mode == "PunchThrough") {
-    DisplayResource = rc_->calcDisplayPlaneResourceOptions(mrc::ResourceCalculator::RenderMode::kModePunchThrough);
-  } else if (display_mode == "Textured") {
-    DisplayResource = rc_->calcDisplayPlaneResourceOptions(mrc::ResourceCalculator::RenderMode::kModeTexture);
-  } else {
-    GMP_DEBUG_PRINT("Wrong display mode: %s", display_mode.c_str());
-    return false;
+  if (reacquiereInfo == false) {
+    AResource = rc_->calcAdecResources((MRC::AudioCodecs)translateAudioCodec(audioResData_.acodec),
+                                        audioResData_.version,
+                                        audioResData_.channel);
+    mrc::concatResourceList(&audioOptions, &AResource);
+    GMP_DEBUG_PRINT("AResource size:%lu, %s, %d",
+                     AResource.size(), AResource.front().type.c_str(), AResource.front().quantity);
+    finalOptions.push_back(audioOptions);
   }
 
-  mrc::concatResourceListOptions(&finalOptions, &DisplayResource);
+  VResource = rc_->calcVdecResourceOptions((MRC::VideoCodecs)translateVideoCodec(videoResData_.vcodec),
+                                            videoResData_.width,
+                                            videoResData_.height,
+                                            videoResData_.frameRate,
+                                            (MRC::ScanType)translateScanType(videoResData_.escanType),
+                                            (MRC::_3DType)translate3DType(videoResData_.e3DType));
+  mrc::concatResourceListOptions(&finalOptions, &VResource);
+
+  if (reacquiereInfo == false) {
+    if (display_mode == "PunchThrough") {
+      DisplayResource = rc_->calcDisplayPlaneResourceOptions(mrc::ResourceCalculator::RenderMode::kModePunchThrough);
+    } else if (display_mode == "Textured") {
+      DisplayResource = rc_->calcDisplayPlaneResourceOptions(mrc::ResourceCalculator::RenderMode::kModeTexture);
+    } else {
+      GMP_DEBUG_PRINT("Wrong display mode: %s", display_mode.c_str());
+      return false;
+    }
+    mrc::concatResourceListOptions(&finalOptions, &DisplayResource);
+  }
 
   JSchemaFragment input_schema("{}");
   JGenerator serializer(nullptr);
-  string payload;
-  string response;
 
   JValue objArray = pbnjson::Array();
   for (auto const & option : finalOptions) {
@@ -144,10 +139,26 @@ bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMa
     }
   }
 
-  if (!serializer.toString(objArray, input_schema, payload)) {
+  if (!serializer.toString(objArray, input_schema, resourceString)) {
     GMP_DEBUG_PRINT("[%s], fail to serializer to string", __func__);
     return false;
   }
+  return true;
+}
+
+
+bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path) {
+
+  string payload;
+
+  if (!calcResources(display_mode, display_path, payload, false)) {
+      GMP_DEBUG_PRINT("acquire calculation of resource error");
+      return false;
+  }
+
+  JSchemaFragment input_schema("{}");
+  JGenerator serializer(nullptr);
+  string response;
 
   GMP_DEBUG_PRINT("send acquire to uMediaServer payload:%s", payload.c_str());
 
@@ -155,35 +166,74 @@ bool ResourceRequestor::acquireResources(void* meta, PortResource_t& resourceMMa
     GMP_DEBUG_PRINT("fail to acquire!!! response : %s", response.c_str());
     return false;
   }
-  GMP_DEBUG_PRINT("acquire response:%s", response.c_str());
 
   try {
     parsePortInformation(response, resourceMMap, res);
-    parseResources(response, acquiredResource_);
+    parseResources(response, adecResource_, vdecResource_, false);
   } catch (const std::runtime_error & err) {
     GMP_DEBUG_PRINT("[%s:%d] err=%s, response:%s",
           __func__, __LINE__, err.what(), response.c_str());
     return false;
   }
 
-  GMP_DEBUG_PRINT("acquired Resource : %s", acquiredResource_.c_str());
   return true;
 }
 
+
 bool ResourceRequestor::releaseResource() {
-  if (acquiredResource_.empty()) {
-    GMP_DEBUG_PRINT("[%s], resource already empty", __func__);
-    return true;
+  bool returnValue = true;
+
+  if (!adecResource_.empty()) {
+    if (!umsRMC_->release(adecResource_))
+      returnValue = false;
+    adecResource_ = "";
   }
 
-  GMP_DEBUG_PRINT("send release to uMediaServer. resource : %s", acquiredResource_.c_str());
+  if (!vdecResource_.empty()) {
+    if (!umsRMC_->release(vdecResource_))
+      returnValue = false;
+    vdecResource_ = "";
+  }
 
-  if (!umsRMC_->release(acquiredResource_)) {
-    GMP_DEBUG_PRINT("release error : %s", acquiredResource_.c_str());
+  return returnValue;
+}
+
+bool ResourceRequestor::reacquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path) {
+  std::string new_resource;
+  string response;
+
+  if (!calcResources(display_mode, display_path, new_resource, true)) {
+      GMP_DEBUG_PRINT("reacquire: calculation of resource error");
+      return false;
+  }
+
+  JValue reaquire_obj = pbnjson::Object();
+  reaquire_obj.put("new", new_resource);
+  reaquire_obj.put("old", vdecResource_);
+
+  JSchemaFragment input_schema("{}");
+  JGenerator serializer(nullptr);
+  string payload;
+
+  if (!serializer.toString(reaquire_obj, input_schema, payload)) {
+    GMP_DEBUG_PRINT("[%s], fail to serializer to string", __func__);
     return false;
   }
 
-  acquiredResource_ = "";
+  if (!umsRMC_->reacquire(payload, response)) {
+    GMP_DEBUG_PRINT("fail to reacquire!!! response : %s", response.c_str());
+    return false;
+  }
+
+  try {
+    parsePortInformation(response, resourceMMap, res);
+    parseResources(response, adecResource_, vdecResource_, true);
+  } catch (const std::runtime_error & err) {
+    GMP_DEBUG_PRINT("[%s:%d] err=%s, response:%s",
+          __func__, __LINE__, err.what(), response.c_str());
+    return false;
+  }
+
   return true;
 }
 
@@ -213,14 +263,23 @@ bool ResourceRequestor::policyActionHandler(const char *action,
     const char *requestorType,
     const char *requestorName,
     const char *connectionId) {
+  bool returnValue = true;
+
   GMP_DEBUG_PRINT("policyActionHandler action:%s, resources:%s, type:%s, name:%s, id:%s",
         action, resources, requestorType, requestorName, connectionId);
   if (allowPolicy_) {
     if ((nullptr != cb_) && !isUnloading_) {
       cb_();
     }
-    if (!umsRMC_->release(acquiredResource_)) {
-      GMP_DEBUG_PRINT("release error in policyActionHandler: %s", acquiredResource_.c_str());
+    if (umsRMC_->release(adecResource_) == false) {
+      GMP_DEBUG_PRINT("release error in policyActionHandler: %s", adecResource_.c_str());
+      returnValue = false;
+    }
+    if (umsRMC_->release(vdecResource_) == false) {
+      GMP_DEBUG_PRINT("release error in policyActionHandler: %s", vdecResource_.c_str());
+      returnValue = false;
+    }
+    if (returnValue == false) {
       return false;
     }
   }
@@ -254,33 +313,47 @@ bool ResourceRequestor::parsePortInformation(const std::string& payload, PortRes
   return true;
 }
 
-bool ResourceRequestor::parseResources(const std::string& payload, std::string& resources) {
+bool ResourceRequestor::parseResources(const std::string& payload,
+                                       std::string& adecResource,
+                                       std::string& vdecResource,
+                                       bool reacquireInfo) {
   JDomParser parser;
   JSchemaFragment input_schema("{}");
-  JGenerator serializer(nullptr);
-
   if (!parser.parse(payload, input_schema)) {
     throw std::runtime_error("payload parsing failure during parseResources");
   }
-
   JValue parsed = parser.getDom();
   if (!parsed.hasKey("resources")) {
     throw std::runtime_error("payload must have \"resources key\"");
   }
-
-  JValue objArray = pbnjson::Array();
-  for (int i=0; i < parsed["resources"].arraySize(); ++i) {
-    JValue obj = pbnjson::Object();
-    obj.put("resource", parsed["resources"][i]["resource"].asString());
-    obj.put("index", parsed["resources"][i]["index"].asNumber<int32_t>());
-    objArray << obj;
+  if (reacquireInfo == false) {
+      adecResource = getResourceString(parsed, std::string("ADEC"));
   }
 
-  if (!serializer.toString(objArray, input_schema, resources)) {
-    throw std::runtime_error("fail to serializer toString during parseResources");
-  }
+  vdecResource = getResourceString(parsed, std::string("VDEC"));
 
   return true;
+}
+
+
+std::string ResourceRequestor::getResourceString(
+    const JValue& parsed, const std::string& resource_type) {
+  JSchemaFragment input_schema("{}");
+  JValue objArray = pbnjson::Array();
+  for (int i=0; i < parsed["resources"].arraySize(); ++i) {
+    if (parsed["resources"][i]["resource"] == resource_type.c_str()) {
+      JValue obj = pbnjson::Object();
+      obj.put("resource", parsed["resources"][i]["resource"].asString());
+      obj.put("index", parsed["resources"][i]["index"].asNumber<int32_t>());
+      objArray << obj;
+    }
+  }
+  std::string resource_str;
+  JGenerator serializer(nullptr);
+  if (!serializer.toString(objArray, input_schema, resource_str)) {
+    throw std::runtime_error("fail to serializer toString during parseResources");
+  }
+  return resource_str;
 }
 
 int ResourceRequestor::translateVideoCodec(const GMP_VIDEO_CODEC vcodec) const {
@@ -318,7 +391,7 @@ int ResourceRequestor::translateAudioCodec(const GMP_AUDIO_CODEC acodec) const {
   MRC::AudioCodec ea = MRC::kAudioEtc;
 
   switch (acodec) {
-    // currently webOS TV only considers "audio/mpeg" or not
+    // currently webOS only considers "audio/mpeg" or not
     case GMP_AUDIO_CODEC_MP3:
       ea = MRC::kAudioMPEG;
       break;
