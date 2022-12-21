@@ -53,7 +53,7 @@ bool UriRtpPlayer::LoadPipeline() {
     GstPadLinkReturn pad_return;
 
     dec_sinkpad = gst_element_get_static_pad(player->pDecElement_,"sink");
-    if (GST_PAD_IS_LINKED (dec_sinkpad)) {
+    if (dec_sinkpad && GST_PAD_IS_LINKED (dec_sinkpad)) {
       g_object_unref (dec_sinkpad);
       return;
     }
@@ -81,16 +81,16 @@ bool UriRtpPlayer::LoadPipeline() {
 
       if (player->pVConvertElement_) {
         video_sinkpad = gst_element_get_static_pad (player->pVConvertElement_, "sink");
-        if (GST_PAD_IS_LINKED (video_sinkpad)) {
+        if (video_sinkpad && GST_PAD_IS_LINKED (video_sinkpad)) {
           g_object_unref (video_sinkpad);
           return;
         }
       } else {
         video_sinkpad = gst_element_get_static_pad (player->pVSinkElement_, "sink");
-        if (GST_PAD_IS_LINKED (video_sinkpad)) {
+        if (video_sinkpad && GST_PAD_IS_LINKED (video_sinkpad)) {
           g_object_unref (video_sinkpad);
           return;
-        }        
+        }
       }
     /* link'n'play */
     pad_return = gst_pad_link (pad, video_sinkpad);
@@ -106,7 +106,7 @@ bool UriRtpPlayer::LoadPipeline() {
 
     /* only link once */
     audio_sinkpad = gst_element_get_static_pad (player->pAConvertElement_, "sink");
-    if (GST_PAD_IS_LINKED (audio_sinkpad)) {
+    if (audio_sinkpad && GST_PAD_IS_LINKED (audio_sinkpad)) {
       g_object_unref (audio_sinkpad);
       return;
     }
