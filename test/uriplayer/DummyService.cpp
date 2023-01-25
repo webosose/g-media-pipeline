@@ -73,6 +73,11 @@ bool DummyService::Pause()
 
 bool DummyService::Seek(const std::string& param)
 {
+  if (!param.length()) {
+    std::cout << std::string("position is empty in Seek! Return..") << std::endl;
+    return false;
+  }
+
   int64_t msec = std::stoi(param) * 1000;
   if (media_player_client_)
     return media_player_client_->Seek(msec);

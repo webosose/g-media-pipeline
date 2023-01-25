@@ -75,49 +75,71 @@ bool UriRtpPlayer::LoadPipeline() {
     str = gst_caps_get_structure (caps, 0);
     gst_caps_unref(caps);
 
-    if (g_strrstr (gst_structure_get_name (str), "video")) {
-      GstPad *video_sinkpad;
+    if (NULL != g_strrstr (gst_structure_get_name (str), "video")) {
+      GstPad *video_sinkpad = nullptr;
       GstPadLinkReturn pad_return;
 
-      if (player->pVConvertElement_) {
+      if (nullptr != player->pVConvertElement_) {
         video_sinkpad = gst_element_get_static_pad (player->pVConvertElement_, "sink");
-        if (video_sinkpad && GST_PAD_IS_LINKED (video_sinkpad)) {
-          g_object_unref (video_sinkpad);
-          return;
+        if(nullptr != video_sinkpad)
+        {
+          if (GST_PAD_IS_LINKED (video_sinkpad)) {
+            g_object_unref (video_sinkpad);
+            return;
+          }
         }
-      } else {
+      } else if (nullptr != player->pVSinkElement_) {
         video_sinkpad = gst_element_get_static_pad (player->pVSinkElement_, "sink");
-        if (video_sinkpad && GST_PAD_IS_LINKED (video_sinkpad)) {
-          g_object_unref (video_sinkpad);
+        if(nullptr != video_sinkpad)
+        {
+          if (GST_PAD_IS_LINKED (video_sinkpad)) {
+            g_object_unref (video_sinkpad);
+            return;
+          }
+        }
+      }
+      if(nullptr == video_sinkpad)
+      {
+        GMP_INFO_PRINT("ERROR :  Can't find video sink pad for linking !!");
+        return;
+      }
+      /* link'n'play */
+      pad_return = gst_pad_link (pad, video_sinkpad);
+      if(pad_return != GST_PAD_LINK_OK) {
+        GMP_INFO_PRINT("ERROR :  Linking failed for the pads !!");
+        return;
+      }
+      if (nullptr != player->pVSinkElement_) {
+        gst_element_sync_state_with_parent(player->pVSinkElement_);
+      }
+      g_object_unref (video_sinkpad);
+    }
+    else if(NULL != g_strrstr (gst_structure_get_name (str), "audio")) {
+      GstPad *audio_sinkpad;
+      GstPadLinkReturn pad_return;
+
+      /* only link once */
+      audio_sinkpad = gst_element_get_static_pad (player->pAConvertElement_, "sink");
+      if(nullptr != audio_sinkpad)
+      {
+        if (GST_PAD_IS_LINKED (audio_sinkpad)) {
+          g_object_unref (audio_sinkpad);
           return;
         }
       }
-    /* link'n'play */
-    pad_return = gst_pad_link (pad, video_sinkpad);
-    if(pad_return != GST_PAD_LINK_OK) {
-      GMP_INFO_PRINT("ERROR :  Linking failed for the pads !!");
-      return;
-    }
-    gst_element_sync_state_with_parent(player->pVSinkElement_);
-    g_object_unref (video_sinkpad);
-  } else if(g_strrstr (gst_structure_get_name (str), "audio")) {
-    GstPad *audio_sinkpad;
-    GstPadLinkReturn pad_return;
-
-    /* only link once */
-    audio_sinkpad = gst_element_get_static_pad (player->pAConvertElement_, "sink");
-    if (audio_sinkpad && GST_PAD_IS_LINKED (audio_sinkpad)) {
+      else
+      {
+        GMP_INFO_PRINT("ERROR :  Can't find audio sink pad for linking !!");
+        return;
+      }
+      /* link'n'play */
+      pad_return = gst_pad_link (pad, audio_sinkpad);
+      if(pad_return != GST_PAD_LINK_OK) {
+        GMP_INFO_PRINT("ERROR :  Linking failed for the pads !!");
+        return;
+      }
+      gst_element_sync_state_with_parent(player->pAConvertElement_);
       g_object_unref (audio_sinkpad);
-      return;
-    }
-    /* link'n'play */
-    pad_return = gst_pad_link (pad, audio_sinkpad);
-    if(pad_return != GST_PAD_LINK_OK) {
-      GMP_INFO_PRINT("ERROR :  Linking failed for the pads !!");
-      return;
-    }
-    gst_element_sync_state_with_parent(player->pAConvertElement_);
-    g_object_unref (audio_sinkpad);
     }
   };
 

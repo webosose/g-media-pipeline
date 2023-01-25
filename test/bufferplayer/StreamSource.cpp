@@ -200,6 +200,11 @@ bool StreamSource::Seek(const std::string& pos)
     return false;
   }
 
+  if (!pos.length()) {
+    std::cout << std::string("position is empty in Seek! Return..") << std::endl;
+    return false;
+  }
+
   int64_t sec = std::stoi(pos);
   if (sec < 0) {
     std::cout << std::string("position is wrong! position = ") << sec << std::endl;
