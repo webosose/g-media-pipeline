@@ -50,8 +50,12 @@ ResourceRequestor::ResourceRequestor(const std::string& appId, const std::string
       umsRMC_ = make_shared<uMediaServer::ResourceManagerClient> ();
       GMP_DEBUG_PRINT("ResourceRequestor creation done");
       umsRMC_->registerPipeline("media", appId_);           // only rmc case
-      connectionId_ = umsRMC_->getConnectionID();   // after registerPipeline
-
+      connectionId_ = (umsRMC_->getConnectionID() ?
+                std::string(umsRMC_->getConnectionID()) : std::string());   // after registerPipeline
+      if (connectionId_.empty()) {
+          GMP_DEBUG_PRINT("Failed to get connection ID");
+          exit(0);
+      }
       // In unmanaged case, we should get display path like this currently
       umsRMC_->getDisplayId(appId_);
     }

@@ -268,6 +268,11 @@ bool UriPlayer::GetSourceInfo() {
 
   if (video_info) {
     GList *first = g_list_first(video_info);
+    if (NULL == first) {
+      GMP_DEBUG_PRINT("video_info list is empty");
+      return false;
+    }
+
     GstDiscovererVideoInfo *video
       = reinterpret_cast<GstDiscovererVideoInfo *>(first->data);
 
@@ -289,6 +294,11 @@ bool UriPlayer::GetSourceInfo() {
 
   if (audio_info) {
     GList *first = g_list_first(audio_info);
+    if (NULL == first) {
+      GMP_DEBUG_PRINT("audio_info list is empty");
+      return false;
+    }
+
     GstDiscovererAudioInfo *audio
       = reinterpret_cast<GstDiscovererAudioInfo *>(first->data);
     audio_stream_info.codec = 0;

@@ -53,6 +53,10 @@ namespace {
 
 bool IsElementName(const GstElement *element, const char *name) {
   gchar *elementName = gst_element_get_name(element);
+  if (nullptr == elementName) {
+    GMP_DEBUG_PRINT("elementName is null");
+    return false;
+  }
   int ret = strcmp(name, elementName);
   g_free(elementName);
   return !ret;
@@ -569,7 +573,14 @@ std::string StreamStatusName(int streamType) {
     "GST_STREAM_STATUS_TYPE_PAUSE",
     "GST_STREAM_STATUS_TYPE_STOP",
   };
-  return std::string(streamStatusName[streamType]);
+
+  if (streamType >= 0 &&
+        streamType < (sizeof(streamStatusName)/sizeof(streamStatusName[0]))) {
+    return std::string(streamStatusName[streamType]);
+  }
+
+  GMP_INFO_PRINT("streamType is out of streamStatusName index range");
+  return std::string();
 }
 
 gboolean BufferPlayer::HandleBusMessage(
