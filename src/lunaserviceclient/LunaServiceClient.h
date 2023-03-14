@@ -18,7 +18,7 @@
 #ifndef SRC_LUNA_CLIENT_H_
 #define SRC_LUNA_CLIENT_H_
 
-#include <lunaservice.h>
+#include <luna-service2/lunaservice.h>
 #include <glib.h>
 
 #include <map>
