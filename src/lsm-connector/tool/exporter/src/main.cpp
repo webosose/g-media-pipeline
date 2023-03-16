@@ -254,10 +254,10 @@ bool rendering(GLData *glData, WaylandEGLSurface *surface)
 
 int main(int argc, char *argv[])
 {
-	if (argc != 1 && argc != 5) {
-		std::cout << "Please input correct agruments! (nothing or x y w h)" << std::endl;
-		return -1;
-	}
+    if (argc != 1 && argc != 5) {
+        std::cout << "Please input correct agruments! (nothing or x y w h)" << std::endl;
+        return -1;
+    }
 
     Wayland::Foreign foreign;
     Wayland::Exporter exporter;
@@ -281,7 +281,16 @@ int main(int argc, char *argv[])
 
     foreign.initialize();
 
-    surface.wlSurface      = wl_compositor_create_surface(foreign.getCompositor());
+    struct wl_compositor *compositor = foreign.getCompositor();
+    if(NULL == compositor)
+    {
+        std::cout << "compositor instance is NULL, probably because HDMI display is not connected." << std::endl;
+        std::cout << "Please rerun the app, after connecting HDMI display." << std::endl;
+        foreign.finalize();
+        return 0;
+    }
+
+    surface.wlSurface      = wl_compositor_create_surface(compositor);
     surface.wlShellSurface = wl_shell_get_shell_surface(foreign.getShell(), surface.wlSurface);
     wl_shell_surface_add_listener(surface.wlShellSurface, &shellSurfaceListener, NULL);
 //    surface.webosShellSurface = wl_webos_shell_get_shell_surface(foreign.getWebosShell(), surface.wlSurface);
@@ -310,7 +319,7 @@ int main(int argc, char *argv[])
 
     while (1) {
         rendering(&glData, &surface);
-		eglSwapBuffers(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_READ));
+        eglSwapBuffers(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_READ));
         sleep(1);
     }
 
