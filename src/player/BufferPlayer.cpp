@@ -543,7 +543,8 @@ MEDIA_STATUS_T BufferPlayer::Feed(const guint8* pBuffer,
     return MEDIA_ERROR;
   }
 
-  if (esData != MEDIA_DATA_CH_NONE) {// raw data
+  // PTS should not be set for live stream buffers like webrtc
+  if (!loadData_->liveStream && esData != MEDIA_DATA_CH_NONE) {
     GST_BUFFER_TIMESTAMP(appSrcBuffer) = pts;
   }
 
