@@ -267,11 +267,7 @@ bool BufferPlayer::SetPlayRate(const double rate) {
   segment_.rate = rate;
 
   if (curState == GST_STATE_PLAYING) {
-#ifdef PLATFORM_QEMUX86
-    newBaseTime = gst_element_get_base_time (pipeline_);
-#else
     newBaseTime = gst_pipeline_get_base_time ((GstPipeline *) pipeline_, /*start-time*/0);
-#endif
     reset_start_time = TRUE;
     update_base_time = TRUE;
     propagate = TRUE;
@@ -1174,6 +1170,8 @@ bool BufferPlayer::AddVideoSinkElement() {
    GMP_DEBUG_PRINT("Create and add video sink element");
 
   videoSink_ = pf::ElementFactory::Create("custom", "video-sink");
+  g_object_set(G_OBJECT(videoSink_), "qos", false, nullptr);
+
   if (!AddAndLinkElement(videoSink_)) {
     GMP_DEBUG_PRINT("Failed to add & link video sink element");
     return false;
