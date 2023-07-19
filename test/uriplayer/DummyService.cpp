@@ -16,6 +16,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <iostream>
+#include <regex>
 #include "DummyService.h"
 
 DummyService::DummyService()
@@ -76,6 +77,11 @@ bool DummyService::Seek(const std::string& param)
   if (!param.length()) {
     std::cout << std::string("position is empty in Seek! Return..") << std::endl;
     return false;
+  }
+
+  if (!(std::regex_match(param, std::regex("^[0-9]+$")))) {
+     std::cout << std::string("Provide Seek position in numeric value") << std::endl;
+     return false;
   }
 
   int64_t msec = std::stoi(param) * 1000;
