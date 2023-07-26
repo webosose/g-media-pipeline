@@ -18,6 +18,7 @@
 #include <iostream>
 #include <string>
 #include "StreamSource.h"
+#include <regex>
 
 namespace gmp { namespace test {
 
@@ -203,6 +204,11 @@ bool StreamSource::Seek(const std::string& pos)
   if (!pos.length()) {
     std::cout << std::string("position is empty in Seek! Return..") << std::endl;
     return false;
+  }
+
+  if (!(std::regex_match(param, std::regex("^[0-9]+$")))) {
+     std::cout << std::string("Provide Seek position in numeric value") << std::endl;
+     return false;
   }
 
   int64_t sec = std::stoi(pos);
