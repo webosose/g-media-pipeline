@@ -206,7 +206,7 @@ bool StreamSource::Seek(const std::string& pos)
     return false;
   }
 
-  if (!(std::regex_match(param, std::regex("^[0-9]+$")))) {
+  if (!(std::regex_match(pos, std::regex("^[0-9]+$")))) {
      std::cout << std::string("Provide Seek position in numeric value") << std::endl;
      return false;
   }
