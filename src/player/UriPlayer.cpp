@@ -29,7 +29,7 @@
 
 #include "parser/parser.h"
 
-#define DISCOVER_EXPIRE_TIME (10 * GST_SECOND)
+#define DISCOVER_EXPIRE_TIME (20 * GST_SECOND)
 #define UPDATE_INTERVAL_MS 200
 
 namespace gmp { namespace player {
