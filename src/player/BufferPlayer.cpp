@@ -1037,8 +1037,11 @@ bool BufferPlayer::AddVideoSourceElement() {
 
   SetAppSrcProperties(videoSrcInfo_.get(), MEDIA_VIDEO_MAX);
 
-  if (loadData_->liveStream)
-    g_object_set(videoSrcInfo_->pSrcElement, "is-live", true, NULL);
+  if (loadData_->liveStream) {
+      g_object_set(videoSrcInfo_->pSrcElement, "is-live", true, NULL);
+      //timestamping will be done by pipeline in case of livestream
+      g_object_set(videoSrcInfo_->pSrcElement, "do-timestamp", true, NULL);
+  }
 
   gst_bin_add(GST_BIN(pipeline_), videoSrcInfo_->pSrcElement);
   linkedElement_ = videoSrcInfo_->pSrcElement;
