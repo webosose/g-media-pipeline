@@ -51,6 +51,7 @@ set(SRC_LIST
 )
 
 add_library(${LSM_CONNECTOR_LIB} SHARED ${SRC_LIST})
+set_target_properties (${LSM_CONNECTOR_LIB} PROPERTIES VERSION 1.0 SOVERSION 1)
 target_link_libraries(${LSM_CONNECTOR_LIB}
     ${PMLOG_LIBRARIES}
     ${WAYLAND_CLIENT_LDFLAGS}

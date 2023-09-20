@@ -18,6 +18,7 @@ set(GMP-CLIENT_HEADERS
     MediaPlayerClient.h)
 
 add_library(gmp-player-client SHARED MediaPlayerClient.cpp)
+set_target_properties (gmp-player-client PROPERTIES VERSION 1.0 SOVERSION 1)
 target_link_libraries(gmp-player-client gmp-player ${RESOURCE-CALCULATOR_LDFLAGS})
 
 install(TARGETS gmp-player-client DESTINATION lib)

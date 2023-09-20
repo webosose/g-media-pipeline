@@ -127,6 +127,7 @@ set(G-MEDIA-PIPELINE_LIB
     )
 
 add_library(gmp-player SHARED ${G-MEDIA-PIPELINE_SRC})
+set_target_properties (gmp-player PROPERTIES VERSION 1.0 SOVERSION 1)
 target_link_libraries(gmp-player ${G-MEDIA-PIPELINE_LIB}
     ${RESOURCE-CALCULATOR_LDFLAGS}
     resource_mgr_client
