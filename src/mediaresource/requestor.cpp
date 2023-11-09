@@ -498,7 +498,7 @@ void ResourceRequestor::planeIdHandler(int32_t planePortIdx) {
   }
 }
 void ResourceRequestor::setAppId(std::string id) {
-  appId_ = id;
+  appId_ = std::move(id);
 }
 
 int32_t ResourceRequestor::getDisplayPath() {

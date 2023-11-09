@@ -29,7 +29,7 @@ namespace gmp {
 typedef std::function<void (const char *)> ResponseHandler;
     struct ResponseHandlerWrapper {
           ResponseHandler handler;
-          explicit ResponseHandlerWrapper(ResponseHandler rh) : handler(rh) { }
+          explicit ResponseHandlerWrapper(ResponseHandler rh) : handler(std::move(rh)) { }
     };
 
 class LunaServiceClient {

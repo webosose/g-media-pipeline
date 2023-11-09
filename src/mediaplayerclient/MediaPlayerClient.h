@@ -63,9 +63,9 @@ class MediaPlayerClient {
                                 const long destWidth,
                                 const long destHeight,
                                 const bool isFullScreen);
-    void RegisterCallback(CALLBACK_T cbFunction) { userCallback_ = cbFunction; }
+    void RegisterCallback(CALLBACK_T cbFunction) { userCallback_ = std::move(cbFunction); }
     void RegisterCallback(CALLBACK_T cbFunction, void* user_data)
-      { RegisterCallback(cbFunction); userData_ = user_data; }
+      { RegisterCallback(std::move(cbFunction)); userData_ = user_data; }
     bool PushEndOfStream();
     bool NotifyForeground() const;
     bool NotifyBackground() const;

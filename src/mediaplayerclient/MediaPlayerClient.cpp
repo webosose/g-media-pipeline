@@ -80,7 +80,7 @@ bool MediaPlayerClient::AcquireResources(base::source_info_t &sourceInfo,
       return false;
     }
 
-    for (auto it : resourceMMap) {
+    for (const auto &it : resourceMMap) {
       GMP_DEBUG_PRINT("Resource::[%s]=>index:%d", it.first.c_str(), it.second);
     }
   }

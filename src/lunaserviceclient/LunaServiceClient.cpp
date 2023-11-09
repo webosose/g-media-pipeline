@@ -66,7 +66,7 @@ bool LunaServiceClient::subscribe(const char *uri,
                                   ResponseHandler handler) {
   GMP_INFO_PRINT("LunaServiceClient subscribe IN");
   AutoLSError error;
-  ResponseHandlerWrapper *wrapper = new ResponseHandlerWrapper(handler);
+  ResponseHandlerWrapper *wrapper = new ResponseHandlerWrapper(std::move(handler));
   if (!wrapper) {
     GMP_INFO_PRINT("LunaServiceClient subscribe wrapper NULL");
     return false;
@@ -120,7 +120,7 @@ bool LunaServiceClient::CallAsync(const char *uri,
                                   ResponseHandler handler) {
   GMP_INFO_PRINT("LunaServiceClient CallAsync IN");
   AutoLSError error;
-  ResponseHandlerWrapper* wrapper = new ResponseHandlerWrapper(handler);
+  ResponseHandlerWrapper* wrapper = new ResponseHandlerWrapper(std::move(handler));
   if (!wrapper) {
     GMP_INFO_PRINT("LunaServiceClient CallAsync wrapper NULL");
     return false;

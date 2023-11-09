@@ -80,8 +80,8 @@ class ResourceRequestor {
   virtual ~ResourceRequestor();
 
   const std::string getConnectionId() const { return connectionId_; }
-  void registerUMSPolicyActionCallback(Functor callback) { cb_ = callback; }
-  void registerPlaneIdCallback(PlaneIDFunctor callback) { planeIdCb_ = callback; }
+  void registerUMSPolicyActionCallback(Functor callback) { cb_ = std::move(callback); }
+  void registerPlaneIdCallback(PlaneIDFunctor callback) { planeIdCb_ = std::move(callback); }
 
   bool acquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);
   bool reacquireResources(void* meta, PortResource_t& resourceMMap, const std::string &display_mode, gmp::base::disp_res_t & res, const int32_t display_path = 0);

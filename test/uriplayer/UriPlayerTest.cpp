@@ -135,7 +135,7 @@ static bool processCommand(DummyService& service, const std::string& cmd)
           std::cout << "Uri is Empty, Please Enter Valid Uri " << std::endl;
           return true;
       } else {
-          param.uri = uri;
+          param.uri = std::move(uri);
       }
 
       composer.put(param);

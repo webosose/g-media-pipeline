@@ -110,7 +110,7 @@ bool AbstractPlayer::UpdateVideoResData(
 }
 
 void AbstractPlayer::RegisterCbFunction(CALLBACK_T callBackFunction) {
-  cbFunction_ = callBackFunction;
+  cbFunction_ = std::move(callBackFunction);
 }
 
 bool AbstractPlayer::PushEndOfStream() {

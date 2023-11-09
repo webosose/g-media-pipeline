@@ -345,7 +345,7 @@ bool BufferPlayer::SetVolume(int volume) {
   const std::string uri = "luna://com.webos.service.audio/setTrackVolume";
 
   ResponseHandler nullcb = [] (const char *){};
-  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),std::move(nullcb))
                    : false;
 
   return ret;
@@ -1806,7 +1806,7 @@ bool BufferPlayer::RegisterTrack(){
     g_object_set(audioSink_, "stream-properties", structure, nullptr);
     gst_structure_free(structure);
   };
-  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),std::move(nullcb))
                          : false;
   return ret;
 }
@@ -1819,7 +1819,7 @@ bool BufferPlayer::UnRegisterTrack(){
 
   const std::string uri = "luna://com.webos.service.audio/unregisterTrack";
   ResponseHandler nullcb = [] (const char *){};
-  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),nullcb)
+  bool ret = (lsClient_) ? lsClient_->CallAsync(uri.c_str(), jsonStr.c_str(),std::move(nullcb))
                          : false;
   return ret;
 }
