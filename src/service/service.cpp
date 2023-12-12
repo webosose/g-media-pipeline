@@ -188,10 +188,9 @@ bool Service::LoadEvent(UMSConnectorHandle *handle, UMSConnectorMessage *message
   instance_->media_player_client_ =
     std::make_unique<gmp::player::MediaPlayerClient>(instance_->app_id_, instance_->media_id_);
 
-  instance_->media_player_client_->RegisterCallback(
-    std::bind(&Service::Notify, instance_,
-      std::placeholders::_1, std::placeholders::_2,
-      std::placeholders::_3, std::placeholders::_4));
+  CALLBACK_T cb = [](const gint notification, const gint64 numValue, const gchar* strValue, void* payload) {
+              instance_->Notify(notification, numValue, strValue, payload); };
+  instance_->media_player_client_->RegisterCallback(std::move(cb));
 
   bool ret;
   ret = instance_->media_player_client_->Load(msg);

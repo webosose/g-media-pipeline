@@ -323,9 +323,5 @@ int main(int argc, char *argv[])
         sleep(1);
     }
 
-    foreign.flush();
-    exporter.finalize();
-    foreign.finalize();
-
     return 0;
 }

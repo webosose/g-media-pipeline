@@ -123,10 +123,9 @@ void MediaPlayerClient::LoadCommon() {
   if (!NotifyForeground())
     GMP_DEBUG_PRINT("NotifyForeground fails");
 
-  player_->RegisterCbFunction(
-      std::bind(&MediaPlayerClient::NotifyFunction, this,
-        std::placeholders::_1, std::placeholders::_2,
-        std::placeholders::_3, std::placeholders::_4));
+  CALLBACK_T cb = [this](const gint type, const gint64 numValue, const gchar* strValue, void* udata){
+              this->NotifyFunction(type, numValue, strValue, udata); };
+  player_->RegisterCbFunction(std::move(cb));
 
   if (resourceRequestor_) {
     resourceRequestor_->registerUMSPolicyActionCallback([this]() {

@@ -122,10 +122,10 @@ class Parser {
         std::sregex_iterator end;
         while (next != end) {
           std::smatch match = *next;
-          if (match.str() == "start") {
+          if (std::strcmp(match.str().c_str(), "start") == 0) {
             ++next;
             match = *next;
-            start_time = std::stoll(match.str(), NULL, 10);
+            start_time = std::stoll(match.str().c_str(), nullptr, 10);
             break;
           }
           ++next;
