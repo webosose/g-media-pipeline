@@ -19,6 +19,7 @@
 
 #include <type_traits>
 #include <pbnjson.hpp>
+#include <cstring>
 #include <string>
 #include <regex>
 #include <gst/gst.h>
