@@ -359,7 +359,8 @@ const char* MediaPlayerClient::GetMediaID() {
   if (!resourceRequestor_)
     return nullptr;
 
-  return resourceRequestor_->getConnectionId().c_str();
+  const char * conn_id = strdup(resourceRequestor_->getConnectionId().c_str());
+  return conn_id;
 }
 
 void MediaPlayerClient::NotifyFunction(const gint cbType, const gint64 numValue,

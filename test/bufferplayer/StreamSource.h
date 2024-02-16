@@ -69,10 +69,10 @@ class StreamSource {
     GstElement *audioAppSink_;
 
     /* signal handler ID */
-    gulong parseBinCB_id_;
-    gulong multiQueueCB_id_;
-    gulong videoAppSinkCB_id_;
-    gulong audioAppSinkCB_id_;
+    gulong parseBinCB_id_ = 0;
+    gulong multiQueueCB_id_ = 0;
+    gulong videoAppSinkCB_id_ = 0;
+    gulong audioAppSinkCB_id_ = 0;
 
     bool firstVideoSample;
     bool firstAudioSample;
