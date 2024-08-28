@@ -30,7 +30,21 @@ class UriRtpPlayer : public UriPlayer {
   virtual bool LoadPipeline();
 
   static bool RegisterObject() {
-    return (gmp::pf::UriPlayerFactory::getInstance()->Register("rtp",&UriRtpPlayer::CreateObject));
+    try {
+        return gmp::pf::UriPlayerFactory::getInstance()->Register("rtp",&UriRtpPlayer::CreateObject);
+    } catch (const std::length_error& e) {
+        GMP_DEBUG_PRINT("Failed to register UriRtpPlayer: %s", e.what());
+        return false;
+    } catch (const std::bad_array_new_length& e) {
+        GMP_DEBUG_PRINT("Failed to register UriRtpPlayer due to bad array new length: %s", e.what());
+        return false;
+    } catch (const std::exception& e) {
+        GMP_DEBUG_PRINT("Failed to register UriRtpPlayer due to an exception: %s", e.what());
+        return false;
+    } catch (...) {
+        GMP_DEBUG_PRINT("Failed to register UriRtpPlayer due to an unknown exception.");
+        return false;
+    }
   }
 
   static std::shared_ptr<gmp::player::Player> CreateObject() {

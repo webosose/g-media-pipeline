@@ -51,7 +51,7 @@
 
 namespace {
 
-bool IsElementName(const GstElement *element, const char *name) {
+bool IsElementName(GstElement *element, const char *name) {
   gchar *elementName = gst_element_get_name(element);
   if (nullptr == elementName) {
     GMP_DEBUG_PRINT("elementName is null");
@@ -365,7 +365,7 @@ bool BufferPlayer::Load(const MEDIA_LOAD_DATA_T* loadData) {
 
   ACQUIRE_RESOURCE_INFO_T resource_info;
   resource_info.sourceInfo = &source_info_;
-  resource_info.displayMode = const_cast<char*>(display_mode_.c_str());
+  resource_info.displayMode = display_mode_.c_str();
   resource_info.result = false;
 
   if (cbFunction_)
@@ -1791,7 +1791,14 @@ void BufferPlayer::SetAppSrcProperties(MEDIA_SRC_T* pAppSrcInfo,
 }
 
 bool BufferPlayer::RegisterTrack(){
-  std::string stream_type = pf::ElementFactory::streamtype[display_path_];
+  std::string stream_type;
+
+  const size_t array_size = sizeof(pf::ElementFactory::streamtype) / sizeof(pf::ElementFactory::streamtype[0]);
+  if (display_path_ < array_size) {
+      stream_type = pf::ElementFactory::streamtype[display_path_];
+  } else {
+      GMP_DEBUG_PRINT("Error: display_path_ index out of bounds");
+  }
 
   pbnjson::JValue jsonValue = pbnjson::Object();
   jsonValue.put("streamType", stream_type);

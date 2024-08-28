@@ -56,7 +56,7 @@ bool UriPlayer::Load(const std::string &str) {
 
   ACQUIRE_RESOURCE_INFO_T resource_info;
   resource_info.sourceInfo = &source_info_;
-  resource_info.displayMode = const_cast<char*>(display_mode_.c_str());
+  resource_info.displayMode = display_mode_.c_str();
   resource_info.result = false;
 
   if (cbFunction_)
@@ -436,8 +436,7 @@ gboolean UriPlayer::HandleBusMessage(GstBus *bus,
       /* video-info message comes from sink element */
       if (gst_structure_has_name(gStruct, "video-info")) {
         GMP_INFO_PRINT("got video-info message");
-        base::video_info_t video_info;
-        memset(&video_info, 0, sizeof(base::video_info_t));
+        base::video_info_t video_info = {};
         gint width, height, fps_n, fps_d, par_n, par_d;
         gst_structure_get_int(gStruct, "width", &width);
         gst_structure_get_int(gStruct, "height", &height);
@@ -578,7 +577,7 @@ gboolean UriPlayer::SourceChangedData(GstElement* gstAppSrc, gint width, gint he
 
   //resource_info.sourceInfo = &(player->source_info_);
   resource_info.sourceInfo = &(sourceInfo);
-  resource_info.displayMode = const_cast<char*>(player->display_mode_.c_str());
+  resource_info.displayMode = player->display_mode_.c_str();
   resource_info.result = false;
 
   if (player->cbFunction_)
@@ -896,7 +895,14 @@ int32_t UriPlayer::ConvertErrorCode(GQuark domain, gint code) {
 }
 
 bool UriPlayer::RegisterTrack(){
-  std::string stream_type = pf::ElementFactory::streamtype[display_path_];
+  std::string stream_type;
+
+  const size_t array_size = sizeof(pf::ElementFactory::streamtype) / sizeof(pf::ElementFactory::streamtype[0]);
+  if (display_path_ < array_size) {
+      stream_type = pf::ElementFactory::streamtype[display_path_];
+  } else {
+      GMP_DEBUG_PRINT("Error: display_path_ index out of bounds");
+  }
 
   pbnjson::JValue jsonValue = pbnjson::Object();
   jsonValue.put("streamType", stream_type);

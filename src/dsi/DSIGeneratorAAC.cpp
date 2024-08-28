@@ -37,6 +37,13 @@ DSIGeneratorAAC::DSIGeneratorAAC(const MEDIA_LOAD_DATA_T* loadData)
     }
 }
 
+DSIGeneratorAAC::~DSIGeneratorAAC() {
+  if (audioCodecData_) {
+    delete[] audioCodecData_;
+    audioCodecData_ = NULL;
+  }
+}
+
 GstCaps* DSIGeneratorAAC::GenerateSpecificInfo()
 {
     GMP_DEBUG_PRINT("");
@@ -111,13 +118,16 @@ GstCaps* DSIGeneratorAAC::GenerateSpecificInfo()
     }
 
     if ((codec_data[0] != 0x00) || (codec_data[1] != 0x00)) {
-        audioCodecData_ = codec_data;
+        audioCodecData_ = new guint8[sizeof(codec_data)];
+        std::memcpy(audioCodecData_, codec_data, sizeof(codec_data));
         audioCodecDataSize_ = sizeof(codec_data);
 
         bool ret = SetGstCodecData();
         if (!ret) {
             GMP_INFO_PRINT("SetGstCodecData fails!");
             gst_caps_unref(caps_);
+            delete[] audioCodecData_;
+            audioCodecData_ = NULL;
             return NULL;
         }
     }

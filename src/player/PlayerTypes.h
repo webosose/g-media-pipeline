@@ -377,7 +377,7 @@ typedef enum {
 
 typedef struct ACQUIRE_RESOURCE_INFO {
   gmp::base::source_info_t* sourceInfo;
-  char *displayMode;
+  const char *displayMode;
   gboolean result;
 } ACQUIRE_RESOURCE_INFO_T;
 

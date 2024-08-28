@@ -106,7 +106,7 @@ bool ResourceRequestor::calcResources(const std::string &display_mode, const int
     mrc::concatResourceList(&audioOptions, &AResource);
     GMP_DEBUG_PRINT("AResource size:%lu, %s, %d",
                      AResource.size(), AResource.front().type.c_str(), AResource.front().quantity);
-    finalOptions.push_back(audioOptions);
+    finalOptions.push_back(std::move(audioOptions));
   }
 
   VResource = rc_->calcVdecResourceOptions((MRC::VideoCodecs)translateVideoCodec(videoResData_.vcodec),

@@ -23,7 +23,7 @@ namespace gmp { namespace dsi {
 class DSIGeneratorAAC : public DSIGenerator {
     public:
         DSIGeneratorAAC(const MEDIA_LOAD_DATA_T *loadData);
-        ~DSIGeneratorAAC() {}
+        ~DSIGeneratorAAC();
         GstCaps* GenerateSpecificInfo() override;
     private:
 
