@@ -18,6 +18,7 @@
 #ifndef SRC_PLAYER_URI_RTP_PLAYER_H_
 #define SRC_PLAYER_URI_RTP_PLAYER_H_
 
+#include <stdexcept>
 #include "UriPlayer.h"
 #include "../playerfactory/UriPlayerFactory.h"
 
