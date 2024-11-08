@@ -1,4 +1,4 @@
-// Copyright (c) 2022 LG Electronics, Inc.
+// Copyright (c) 2022-2024 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -146,8 +146,7 @@ bool UriRtpPlayer::LoadPipeline() {
   g_signal_connect(pSrcElement_,"pad-added", G_CALLBACK(addDecoderCB),this);
   g_signal_connect(pDecElement_,"pad-added", G_CALLBACK(addSinkCB),this);
 
-
-  pVConvertElement_ = pf::ElementFactory::Create("custom", "video-converter");
+  pVConvertElement_ = gst_element_factory_make("videoconvert", "videoconvert");
   pVSinkElement_ = gst_element_factory_make("waylandsink", "waylandsink");
   if(!pVSinkElement_) {
     GMP_INFO_PRINT("ERROR : No waylandsink element !");
@@ -170,6 +169,12 @@ bool UriRtpPlayer::LoadPipeline() {
     GMP_INFO_PRINT("ERROR : No audioconvert element !");
     return false;
   }
+
+  gint scale_width = VIDEO_SCALE_WIDTH;
+  gint scale_height = (source_info_.video_streams[0].height * scale_width) /
+                     source_info_.video_streams[0].width;
+  lsm_connector_.setVideoSize(scale_width, scale_height);
+
   gst_bin_add_many(GST_BIN(pipeline_),pSrcElement_, pDecElement_, pAConvertElement_, aSink, pVSinkElement_, NULL);
   gst_bin_add(GST_BIN(pipeline_), pVConvertElement_);
   if (pVConvertElement_) {
