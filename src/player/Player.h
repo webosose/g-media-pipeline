@@ -31,7 +31,7 @@
 #include "log/log.h"
 
 static constexpr char const *waylandDisplayHandleContextType =
-	"GstWaylandDisplayHandleContextType";
+    "GstWlDisplayHandleContextType";
 
 namespace gmp { namespace player {
 class Player {

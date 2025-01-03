@@ -21,7 +21,7 @@
 
 static guint signal_watch_intr_id;
 static constexpr char const *waylandDisplayHandleContextType =
-	"GstWaylandDisplayHandleContextType";
+    "GstWlDisplayHandleContextType";
 
 typedef struct {
     EGLDisplay eglDisplay;
