@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 LG Electronics, Inc.
+// Copyright (c) 2018-2025 LG Electronics, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -247,7 +247,6 @@ bool rendering(GLData *glData, WaylandEGLSurface *surface)
     glVertexAttribPointer(VERTEX_ARRAY, 3, GL_FLOAT, GL_FALSE, glData->vertexStride, 0);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    eglSwapBuffers(eglGetCurrentDisplay(), eglGetCurrentSurface(EGL_READ));
 
     return true;
 }
